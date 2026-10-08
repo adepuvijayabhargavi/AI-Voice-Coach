@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - AI Voice Coach</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand"><span>&#127908;</span> AI Voice Coach</a>
+            <button class="navbar-toggle" onclick="toggleNav()">&#9776;</button>
+            <ul class="navbar-nav">
+                <li><a href="{{ url_for('admin_dashboard') }}" class="{% if active_page == 'dashboard' %}active{% endif %}">Admin Dashboard</a></li>
+                <li><a href="{{ url_for('admin_users') }}" class="{% if active_page == 'users' %}active{% endif %}">Users</a></li>
+                <li><a href="{{ url_for('admin_analytics') }}" class="{% if active_page == 'analytics' %}active{% endif %}">Analytics</a></li>
+                <li><a href="{{ url_for('admin_reports') }}" class="{% if active_page == 'reports' %}active{% endif %}">System Reports</a></li>
+                {% if user %}
+                <li class="navbar-user">
+                    <span class="user-name">&#128081; {{ user.full_name }} (Admin)</span>
+                    <a href="/logout" class="btn btn-outline btn-sm">Logout</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container page-content">
+
+        <div class="section-header">
+            <h2>&#128200; Admin Dashboard</h2>
+            <p>System-wide overview of users, practice and interview activity.</p>
+        </div>
+
+        <!-- STATISTICS -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">&#128101;</div>
+                <div class="stat-value">{{ stats.total_users }}</div>
+                <div class="stat-label">Total Registered Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#127912;</div>
+                <div class="stat-value">{{ stats.total_practice }}</div>
+                <div class="stat-label">Practice Sessions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#128172;</div>
+                <div class="stat-value">{{ stats.total_mock }}</div>
+                <div class="stat-label">Mock Interviews</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#128221;</div>
+                <div class="stat-value">{{ stats.total_interviews }}</div>
+                <div class="stat-label">Total Completed Interviews</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#127942;</div>
+                <div class="stat-value">{% if stats.avg_overall is not none %}{{ stats.avg_overall }}<span style="font-size:1rem;"> / 100</span>{% else %}--{% endif %}</div>
+                <div class="stat-label">Average Overall Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#128196;</div>
+                <div class="stat-value">{{ stats.total_resume }}</div>
+                <div class="stat-label">Resume Interviews</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#127942;</div>
+                <div class="stat-value">{{ stats.highest_overall if stats.highest_overall is not none else '--' }}</div>
+                <div class="stat-label">Highest Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#128200;</div>
+                <div class="stat-value">{{ stats.lowest_overall if stats.lowest_overall is not none else '--' }}</div>
+                <div class="stat-label">Lowest Score</div>
+            </div>
+        </div>
+
+        <!-- ANALYTICS LINKS -->
+        <div class="card mb-3">
+            <div class="card-header">&#128202; Quick Analytics</div>
+            <div style="padding:20px; display:flex; gap:12px; flex-wrap:wrap;">
+                <a href="{{ url_for('admin_analytics') }}" class="btn btn-primary">View Interview Analytics</a>
+                <a href="{{ url_for('admin_users') }}" class="btn btn-outline">Manage Users</a>
+                <a href="{{ url_for('admin_reports') }}" class="btn btn-outline">System Reports</a>
+            </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <!-- RECENT REGISTRATIONS -->
+            <div class="card mb-3">
+                <div class="card-header">&#128118; Recent Registrations</div>
+                <div style="padding:0 20px 20px;">
+                    {% if recent_users %}
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in recent_users %}
+                            <tr>
+                                <td><a href="/admin/user/{{ u.id }}">{{ u.full_name }}</a></td>
+                                <td>{{ u.email }}</td>
+                                <td>{{ u.created_at.strftime('%b %d, %Y') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="text-muted">No registered users yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- RECENT INTERVIEWS -->
+            <div class="card mb-3">
+                <div class="card-header">&#128172; Recent Interviews</div>
+                <div style="padding:0 20px 20px;">
+                    {% if recent_interviews %}
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Type</th>
+                                <th>Score</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for inv in recent_interviews %}
+                            <tr>
+                                <td>{{ inv.full_name }}</td>
+                                <td>{{ inv.interview_type }}</td>
+                                <td><span class="score-badge {% if inv.overall_score >= 80 %}high{% elif inv.overall_score >= 60 %}medium{% else %}low{% endif %}">{{ inv.overall_score }} / 100</span></td>
+                                <td>{{ inv.created_at.strftime('%b %d, %Y') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="text-muted">No interviews recorded yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

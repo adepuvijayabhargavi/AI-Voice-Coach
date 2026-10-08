@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Interview & Communication Coach</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <!-- NAVIGATION -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand">
+                <span>&#127908;</span> AI Voice Coach
+            </a>
+            <button class="navbar-toggle" onclick="toggleNav()">&#9776;</button>
+            <ul class="navbar-nav">
+                <li><a href="/" class="active">Home</a></li>
+                <li><a href="/practice">Practice</a></li>
+                <li><a href="/mock-interview">Mock Interview</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="/reports">Reports</a></li>
+                <li><a href="/improvement-plan">Improvement Plan</a></li>
+                {% if session.get('role') == 'admin' %}
+                <li><a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a></li>
+                {% endif %}
+                {% if user %}
+                <li class="navbar-user">
+                    <span class="user-name">&#128100; {{ user.full_name }}</span>
+                    <a href="/logout" class="btn btn-outline btn-sm">Logout</a>
+                </li>
+                {% else %}
+                <li class="navbar-auth">
+                    <a href="/login" class="btn btn-outline btn-sm">Login</a>
+                    <a href="/signup" class="btn btn-primary btn-sm">Sign Up</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container page-content">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        {% for msg in messages %}
+        <div class="alert alert-warning" style="margin-top:16px;">{{ msg }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <!-- HERO -->
+        <section class="hero">
+            <h1>AI Interview &amp; Communication Coach</h1>
+            <p class="subtitle">
+                Practice smarter. Speak confidently.<br>
+                Improve continuously with AI.
+            </p>
+            <div class="hero-actions">
+                <a href="/practice" class="btn btn-primary btn-lg">Start Practice</a>
+                <a href="/mock-interview" class="btn btn-outline btn-lg">Mock Interview</a>
+            </div>
+        </section>
+
+        <!-- QUICK STATS -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">&#128202;</div>
+                <div class="stat-value">{{ stats.total_interviews }}</div>
+                <div class="stat-label">Interview Sessions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#127942;</div>
+                <div class="stat-marks">{{ stats.average_score if stats.average_score is not none else '--' }}{{ ' / 100' if stats.average_score is not none }}</div>
+                <div class="stat-pct">{{ stats.average_score if stats.average_score is not none else '--' }}{{ '%' if stats.average_score is not none }}</div>
+                <div class="stat-label">Average Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#127775;</div>
+                <div class="stat-marks">{{ stats.best_score if stats.best_score is not none else '--' }}{{ ' / 100' if stats.best_score is not none }}</div>
+                <div class="stat-pct">{{ stats.best_score if stats.best_score is not none else '--' }}{{ '%' if stats.best_score is not none }}</div>
+                <div class="stat-label">Best Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#128293;</div>
+                <div class="stat-value">{{ stats.current_streak }}</div>
+                <div class="stat-label">Current Streak</div>
+            </div>
+        </div>
+
+        <!-- PRACTICE MODES -->
+        <div class="section-header">
+            <h2>Practice Modes</h2>
+            <p>Choose a mode to begin practicing</p>
+        </div>
+
+        <div class="modes-grid">
+            <a href="/practice?type=hr" class="mode-card">
+                <span class="mode-icon">&#128188;</span>
+                <div class="mode-name">HR Interview</div>
+                <div class="mode-desc">Common HR questions</div>
+            </a>
+            <a href="/practice?type=technical" class="mode-card">
+                <span class="mode-icon">&#128187;</span>
+                <div class="mode-name">Technical</div>
+                <div class="mode-desc">Tech & coding questions</div>
+            </a>
+            <a href="/practice?type=behavioral" class="mode-card">
+                <span class="mode-icon">&#129504;</span>
+                <div class="mode-name">Behavioral</div>
+                <div class="mode-desc">STAR method questions</div>
+            </a>
+            <a href="/practice?type=communication" class="mode-card">
+                <span class="mode-icon">&#127908;</span>
+                <div class="mode-name">Communication</div>
+                <div class="mode-desc">Speaking & clarity</div>
+            </a>
+            <a href="/resume" class="mode-card">
+                <span class="mode-icon">&#128196;</span>
+                <div class="mode-name">Resume-Based</div>
+                <div class="mode-desc">Questions from your resume</div>
+            </a>
+        </div>
+
+        <!-- AI RECOMMENDATION -->
+        <div class="ai-recommendation" id="aiRecommendation">
+            <div class="rec-header">&#129302; AI Recommendation</div>
+            <div class="rec-text" id="recText">
+                Start practicing to receive personalized AI recommendations based on your performance.
+            </div>
+        </div>
+
+        <!-- QUICK PRACTICE (Inline) -->
+        <div class="card mt-4">
+            <div class="card-header">&#127908; Quick Practice</div>
+
+            <div class="question-display">
+                <div class="question-number">Current Question</div>
+                <div class="question-text" id="currentQuestion">Tell me about yourself.</div>
+            </div>
+
+            <div class="text-center mt-2">
+                <button id="startBtn" onclick="toggleSpeech()" class="btn btn-primary btn-lg">
+                    &#127908; Start Speaking
+                </button>
+            </div>
+
+            <p id="status" class="text-center mt-2 text-muted">
+                Click the button and start speaking.
+            </p>
+
+            <h5 class="mt-3">Your Answer</h5>
+            <div id="transcript" class="transcript-box empty">
+                Your speech will appear here...
+            </div>
+
+            <div class="text-center mt-3">
+                <button id="analyzeBtn" onclick="analyzeAnswer()" class="btn btn-success btn-lg">
+                    &#129302; Analyze My Answer
+                </button>
+            </div>
+
+            <div id="loading" class="loading-overlay">
+                <div class="spinner"></div>
+                <p>AI is analyzing your answer...</p>
+            </div>
+
+            <div id="analysisResult"></div>
+        </div>
+
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

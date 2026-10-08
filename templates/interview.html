@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mock Interview - AI Voice Coach</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand"><span>&#127908;</span> AI Voice Coach</a>
+            <button class="navbar-toggle" onclick="toggleNav()">&#9776;</button>
+            <ul class="navbar-nav">
+                <li><a href="/">Home</a></li>
+                <li><a href="/practice">Practice</a></li>
+                <li><a href="/mock-interview" class="active">Mock Interview</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="/reports">Reports</a></li>
+                <li><a href="/improvement-plan">Improvement Plan</a></li>
+                {% if session.get('role') == 'admin' %}
+                <li><a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a></li>
+                {% endif %}
+                {% if user %}
+                <li class="navbar-user">
+                    <span class="user-name">&#128100; {{ user.full_name }}</span>
+                    <a href="/logout" class="btn btn-outline btn-sm">Logout</a>
+                </li>
+                {% else %}
+                <li class="navbar-auth">
+                    <a href="/login" class="btn btn-outline btn-sm">Login</a>
+                    <a href="/signup" class="btn btn-primary btn-sm">Sign Up</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container page-content">
+
+        <div class="section-header">
+            <h2>AI Mock Interview</h2>
+            <p>Simulate a real interview with AI-powered adaptive questions</p>
+        </div>
+
+        <!-- SETUP -->
+        <div class="card mb-3" id="interviewSetup">
+            <div class="card-header">&#9881; Mock Interview Setup</div>
+            <div class="settings-grid">
+                <div class="form-group">
+                    <label>Target Role</label>
+                    <select id="mockRole" class="form-control">
+                        <option value="software_developer">Software Developer</option>
+                        <option value="python_developer">Python Developer</option>
+                        <option value="full_stack_developer">Full Stack Developer</option>
+                        <option value="frontend_developer">Frontend Developer</option>
+                        <option value="backend_developer">Backend Developer</option>
+                        <option value="data_analyst">Data Analyst</option>
+                        <option value="ml_engineer">Machine Learning Engineer</option>
+                        <option value="ai_ml_engineer">AI/ML Engineer</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Interview Type</label>
+                    <select id="mockType" class="form-control">
+                        <option value="technical">Technical</option>
+                        <option value="hr">HR Interview</option>
+                        <option value="behavioral">Behavioral</option>
+                        <option value="general">General</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Experience</label>
+                    <select id="mockExperience" class="form-control">
+                        <option value="fresher">Fresher</option>
+                        <option value="intermediate">Intermediate</option>
+                        <option value="experienced">Experienced</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Difficulty</label>
+                    <select id="mockDifficulty" class="form-control">
+                        <option value="beginner">Beginner</option>
+                        <option value="intermediate" selected>Intermediate</option>
+                        <option value="advanced">Advanced</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Number of Questions</label>
+                    <select id="mockCount" class="form-control">
+                        <option value="5">5 Questions</option>
+                        <option value="10" selected>10 Questions</option>
+                        <option value="15">15 Questions</option>
+                        <option value="20">20 Questions</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Interviewer Style</label>
+                    <select id="interviewerStyle" class="form-control">
+                        <option value="friendly">Friendly</option>
+                        <option value="professional" selected>Professional</option>
+                        <option value="strict">Strict</option>
+                    </select>
+                </div>
+            </div>
+            <div class="text-center mt-3">
+                <button onclick="startMockInterview()" class="btn btn-primary btn-lg" id="startMockBtn">Start Mock Interview</button>
+            </div>
+        </div>
+
+        <!-- LOADING -->
+        <div class="card mb-3 hidden" id="interviewLoading">
+            <div class="text-center" style="padding:3rem;">
+                <div class="spinner" style="margin:0 auto 1rem;"></div>
+                <p class="text-muted">Preparing your interview...</p>
+            </div>
+        </div>
+
+        <!-- INTERVIEW IN PROGRESS -->
+        <div class="card mb-3 hidden" id="interviewActive">
+            <div class="card-header">
+                <span>&#128188; AI Interviewer</span>
+                <span style="margin-left:auto;font-size:0.85rem;color:var(--text-muted);">
+                    Question <span id="mockQNum">1</span> / <span id="mockQTotal">10</span>
+                </span>
+            </div>
+
+            <div class="interviewer-message" id="interviewerMessage"></div>
+
+            <div class="question-display">
+                <div class="question-text" id="mockQuestion">Loading...</div>
+                <button id="replayBtn" onclick="replayQuestion()" class="btn btn-outline btn-sm" style="margin-top:0.75rem;">&#128266; Replay Question</button>
+            </div>
+
+            <div class="text-center mt-2">
+                <button id="startBtn" onclick="mockToggleSpeech()" class="btn btn-primary btn-lg">
+                    &#127908; Start Speaking
+                </button>
+            </div>
+            <p id="status" class="text-center mt-2 text-muted">Click the button and start speaking.</p>
+
+            <h5 class="mt-3">Your Answer</h5>
+            <div id="transcript" class="transcript-box empty">Your speech will appear here...</div>
+
+            <div class="text-center mt-3">
+                <button id="analyzeBtn" onclick="submitMockAnswer()" class="btn btn-success btn-lg">
+                    Submit Answer
+                </button>
+            </div>
+
+            <div id="loading" class="loading-overlay">
+                <div class="spinner"></div>
+                <p>Processing your answer...</p>
+            </div>
+
+            <div id="mockFeedback" class="mt-3"></div>
+        </div>
+
+        <!-- INTERVIEW COMPLETE -->
+        <div class="card hidden" id="interviewComplete">
+            <div class="card-header">&#127881; Interview Complete</div>
+            <div id="interviewReport"></div>
+            <div id="saveStatus"></div>
+            <div class="text-center mt-3">
+                <a href="/dashboard" class="btn btn-primary">View Dashboard</a>
+                <button onclick="resetInterview()" class="btn btn-outline" style="margin-left:0.5rem;">New Interview</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        var mockHistory = [];
+        var mockScores = [];
+        var mockIndex = 0;
+        var totalMock = 10;
+        var currentMockQuestion = "";
+        var interviewerStyle = "professional";
+        var currentUserId = {{ user_id | tojson }};
+
+        var stylePrompts = {
+            friendly: "Be warm, encouraging, and supportive. Smile through your words. Offer gentle guidance.",
+            professional: "Be formal, structured, and business-like. Maintain a neutral, respectful tone.",
+            strict: "Be direct, challenging, and demanding. Push the candidate to give better answers. Be critical but fair."
+        };
+
+        var questionTtsSpeaking = false;
+        var speakQuestionTimer = null;
+
+        function setStartSpeakingEnabled(enabled) {
+            var btn = document.getElementById("startBtn");
+            if (!btn) return;
+            if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) return;
+            btn.disabled = !enabled;
+        }
+
+        function stopSpeaking() {
+            if (speakQuestionTimer) { clearTimeout(speakQuestionTimer); speakQuestionTimer = null; }
+            stopSpeechTTS();
+            questionTtsSpeaking = false;
+            setStartSpeakingEnabled(true);
+        }
+
+        function autoSpeakQuestion() {
+            if (speakQuestionTimer) { clearTimeout(speakQuestionTimer); speakQuestionTimer = null; }
+            speakQuestionTimer = setTimeout(function() {
+                speakQuestionTimer = null;
+                questionTtsSpeaking = true;
+                setStartSpeakingEnabled(false);
+                speakQuestion(currentMockQuestion, {
+                    onend: function() {
+                        questionTtsSpeaking = false;
+                        setStartSpeakingEnabled(true);
+                    },
+                    onerror: function() {
+                        questionTtsSpeaking = false;
+                        setStartSpeakingEnabled(true);
+                    }
+                });
+            }, 150);
+        }
+
+        function replayQuestion() {
+            if (!currentMockQuestion) return;
+            if (recognition && isListening) recognition.stop();
+            questionTtsSpeaking = true;
+            setStartSpeakingEnabled(false);
+            speakQuestion(currentMockQuestion, {
+                onend: function() {
+                    questionTtsSpeaking = false;
+                    setStartSpeakingEnabled(true);
+                },
+                onerror: function() {
+                    questionTtsSpeaking = false;
+                    setStartSpeakingEnabled(true);
+                }
+            });
+        }
+
+        function mockToggleSpeech() {
+            stopSpeechTTS();
+            questionTtsSpeaking = false;
+            setStartSpeakingEnabled(true);
+            toggleSpeech();
+        }
+
+        function friendlyApiError(data) {
+            if (!data || typeof data !== "object") return "Analysis failed. Please try again.";
+            if (data.error_type === "quota") return "Gemini API rate limit reached. Please wait a moment and try again.";
+            if (data.error_type === "auth") return "AI API key is invalid or unavailable.";
+            if (data.error_type === "config") return "AI service configuration error.";
+            return data.error || "Analysis failed. Please try again.";
+        }
+
+        function escHtml(t) {
+            var d = document.createElement("div");
+            d.textContent = t == null ? "" : String(t);
+            return d.innerHTML;
+        }
+
+        async function fetchWithTimeout(url, options, timeoutMs) {
+            var controller = new AbortController();
+            var timer = setTimeout(function() { controller.abort(); }, timeoutMs || 60000);
+            try {
+                return await fetch(url, Object.assign({}, options, {signal: controller.signal}));
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
+        function showInterviewSection(id) {
+            stopSpeaking();
+            ["interviewSetup", "interviewLoading", "interviewActive", "interviewComplete"].forEach(function(s) {
+                var el = document.getElementById(s);
+                if (el) el.classList.add("hidden");
+            });
+            var el = document.getElementById(id);
+            if (el) el.classList.remove("hidden");
+        }
+
+        async function startMockInterview() {
+            totalMock = parseInt(document.getElementById("mockCount").value);
+            interviewerStyle = document.getElementById("interviewerStyle").value;
+            mockHistory = [];
+            mockScores = [];
+            mockIndex = 0;
+            currentMockQuestion = "";
+
+            showInterviewSection("interviewLoading");
+
+            var type = document.getElementById("mockType").value;
+            var diff = document.getElementById("mockDifficulty").value;
+
+            try {
+                var res = await fetch("/api/generate-questions", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        interview_type: type,
+                        role: document.getElementById("mockRole").value,
+                        experience: document.getElementById("mockExperience").value,
+                        difficulty: diff,
+                        count: Math.min(totalMock, 5),
+                        history: []
+                    })
+                });
+                var data = await res.json();
+                if (data.questions && data.questions.length > 0) {
+                    mockHistory = data.questions.map(function(q) { return { question: q, answer: "", score: null }; });
+                }
+            } catch (e) {
+                console.error("Question generation failed:", e);
+            }
+
+            if (mockHistory.length === 0) {
+                mockHistory = [{ question: "Tell me about yourself.", answer: "", score: null }];
+            }
+
+            document.getElementById("mockQTotal").innerText = totalMock;
+            showInterviewSection("interviewActive");
+            showMockQuestion();
+        }
+
+        function showMockQuestion() {
+            document.getElementById("mockQNum").innerText = mockIndex + 1;
+
+            if (mockIndex < mockHistory.length) {
+                currentMockQuestion = mockHistory[mockIndex].question;
+            } else {
+                currentMockQuestion = "Tell me more about your experience.";
+            }
+
+            document.getElementById("mockQuestion").innerText = currentMockQuestion;
+
+            var styleMsg = {
+                friendly: "Take your time. I am here to help you succeed.",
+                professional: "Please proceed with your answer.",
+                strict: "Give me a specific, detailed example."
+            };
+            document.getElementById("interviewerMessage").innerText = styleMsg[interviewerStyle] || "";
+
+            document.getElementById("mockFeedback").innerHTML = "";
+            var transcript = document.getElementById("transcript");
+            transcript.innerText = "Your speech will appear here...";
+            transcript.classList.add("empty");
+
+            autoSpeakQuestion();
+        }
+
+        async function submitMockAnswer() {
+            var transcript = document.getElementById("transcript");
+            var answer = transcript.innerText.trim();
+            if (!answer || answer === "Your speech will appear here..." || answer === "Listening...") {
+                alert("Please provide an answer before submitting.");
+                return;
+            }
+
+            stopSpeaking();
+
+            console.log("Mock interview submit clicked");
+            console.log("Question:", currentMockQuestion);
+            console.log("Answer:", answer);
+            console.log("Answer length:", answer.length);
+            console.log("User ID:", currentUserId, "Question index:", mockIndex);
+
+            var loading = document.getElementById("loading");
+            var analyzeBtn = document.getElementById("analyzeBtn");
+            loading.classList.add("active");
+            analyzeBtn.disabled = true;
+
+            var type = document.getElementById("mockType").value;
+            var requestPayload = {
+                text: answer,
+                question: currentMockQuestion,
+                interview_type: type,
+                question_index: mockIndex + 1,
+                user_id: currentUserId
+            };
+            console.log("Request URL: /analyze");
+            console.log("Request payload:", JSON.stringify(requestPayload));
+
+            try {
+                var res = await fetchWithTimeout("/analyze", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify(requestPayload)
+                }, 90000);
+
+                var data = await res.json();
+                console.log("API response:", data);
+
+                if (data.error) {
+                    document.getElementById("mockFeedback").innerHTML = '<div class="alert alert-error">' + friendlyApiError(data) + '</div>';
+                    return;
+                }
+
+                mockScores.push({
+                    overall: (typeof data.overall_score === "number" ? data.overall_score : 70),
+                    scores: data.scores || {},
+                    question: currentMockQuestion,
+                    answer: answer,
+                    feedback: data.ai_feedback || data.feedback_note || "",
+                    better_answer: data.better_answer || ""
+                });
+
+                if (mockIndex < mockHistory.length) {
+                    mockHistory[mockIndex].answer = answer;
+                    mockHistory[mockIndex].score = (typeof data.overall_score === "number" ? data.overall_score : 70);
+                }
+
+                console.log("Score:", data.overall_score);
+
+                mockIndex++;
+
+                if (mockIndex < totalMock) {
+                    if (recognition && isListening) recognition.stop();
+                    generateNextQuestion(answer);
+                } else {
+                    document.getElementById("mockFeedback").innerHTML = '<div class="text-center text-muted"><div class="spinner" style="width:24px;height:24px;margin:0 auto;"></div><p style="margin-top:0.5rem;">Preparing your interview results...</p></div>';
+                    if (recognition && isListening) recognition.stop();
+                    finishInterview();
+                }
+            } catch (e) {
+                console.error("Answer evaluation failed:", e);
+                var msg = (e && e.name === "AbortError")
+                    ? "The evaluation is taking too long. Please try again."
+                    : "Could not connect to server. Please try again.";
+                document.getElementById("mockFeedback").innerHTML = '<div class="alert alert-error">' + escHtml(msg) + '</div>';
+            } finally {
+                loading.classList.remove("active");
+                analyzeBtn.disabled = false;
+            }
+        }
+
+        async function generateNextQuestion(previousAnswer) {
+            document.getElementById("mockFeedback").innerHTML = '<div class="text-center text-muted"><div class="spinner" style="width:24px;height:24px;margin:0 auto;"></div><p style="margin-top:0.5rem;">Preparing next question...</p></div>';
+
+            var type = document.getElementById("mockType").value;
+
+            try {
+                var res = await fetchWithTimeout("/api/next-question", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        interview_type: type,
+                        role: document.getElementById("mockRole").value,
+                        experience: document.getElementById("mockExperience").value,
+                        difficulty: document.getElementById("mockDifficulty").value,
+                        history: mockHistory.slice(0, mockIndex),
+                        question_number: mockIndex + 1,
+                        total_questions: totalMock
+                    })
+                }, 60000);
+                var data = await res.json();
+                if (data.question) {
+                    currentMockQuestion = data.question;
+                    mockHistory.push({ question: data.question, answer: "", score: null });
+                }
+            } catch (e) {
+                console.error("Next question generation failed:", e);
+                currentMockQuestion = "Can you tell me more about that?";
+                mockHistory.push({ question: currentMockQuestion, answer: "", score: null });
+            }
+
+            showMockQuestion();
+        }
+
+        async function finishInterview() {
+            stopSpeaking();
+            showInterviewSection("interviewComplete");
+
+            var total = mockScores.length;
+            var avgScore = 0;
+            var categoryTotals = {};
+            var categoryCounts = {};
+
+            if (total > 0) {
+                var sum = 0;
+                mockScores.forEach(function(s) {
+                    sum += s.overall;
+                    if (s.scores) {
+                        for (var cat in s.scores) {
+                            categoryTotals[cat] = (categoryTotals[cat] || 0) + s.scores[cat];
+                            categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+                        }
+                    }
+                });
+                avgScore = Math.round(sum / total);
+            }
+
+            var catLabels = {
+                communication: "Communication",
+                confidence: "Confidence",
+                clarity: "Clarity",
+                grammar: "Grammar",
+                relevance: "Relevance",
+                structure: "Answer Structure",
+                technical_knowledge: "Technical Knowledge"
+            };
+
+            var strengths = [];
+            var improvements = [];
+
+            for (var cat in categoryTotals) {
+                var avg = Math.round(categoryTotals[cat] / categoryCounts[cat]);
+                var label = catLabels[cat] || cat;
+                if (avg >= 80) strengths.push(label + ": " + avg + " / 100 (" + avg + "%)");
+                else if (avg < 70) improvements.push(label + ": " + avg + " / 100 (" + avg + "%)");
+            }
+
+            var html = '<div class="report-section">';
+            html += '<div class="report-score-display">';
+            html += '<div class="report-marks">' + avgScore + ' / 100</div>';
+            html += '<div class="report-pct">' + avgScore + '%</div>';
+            html += '<div class="text-muted">Overall Score</div>';
+            html += '<div class="text-muted" style="margin-top:0.25rem;">' + total + ' questions completed</div>';
+            html += '</div></div>';
+
+            html += '<div class="report-section">';
+            html += '<h4>Category Scores</h4>';
+            html += '<div class="score-overview">';
+            for (var cat in categoryTotals) {
+                var avg = Math.round(categoryTotals[cat] / categoryCounts[cat]);
+                var label = catLabels[cat] || cat;
+                var cls = avg >= 80 ? "high" : avg >= 60 ? "medium" : "low";
+                html += '<div class="score-item"><div class="score-label">' + label + '</div><div class="score-marks ' + cls + '">' + avg + ' / 100</div><div class="score-pct">' + avg + '%</div></div>';
+            }
+            html += '<div class="score-item" style="border: 2px solid var(--primary); background: #eef2ff;"><div class="score-label" style="font-weight: 700;">Total Performance</div><div class="score-marks" style="font-size: 1.5rem;">' + avgScore + ' / 100</div><div class="score-pct">' + avgScore + '%</div></div>';
+            html += '</div></div>';
+
+            if (strengths.length > 0) {
+                html += '<div class="report-section"><h4>Strengths</h4><ul class="strengths-list">';
+                strengths.forEach(function(s) { html += '<li>' + s + '</li>'; });
+                html += '</ul></div>';
+            }
+
+            if (improvements.length > 0) {
+                html += '<div class="report-section"><h4>Areas for Improvement</h4><ul class="improvements-list">';
+                improvements.forEach(function(s) { html += '<li>' + s + '</li>'; });
+                html += '</ul></div>';
+            }
+
+            if (mockScores.length > 0) {
+                html += '<div class="report-section"><h4>Question Review</h4>';
+                mockScores.forEach(function(s, i) {
+                    var cls = s.overall >= 80 ? "high" : s.overall >= 60 ? "medium" : "low";
+                    html += '<div class="review-item">';
+                    html += '<div class="review-question"><strong>Q' + (i+1) + ':</strong> ' + escapeHtml(s.question) + '</div>';
+                    html += '<div class="review-answer">' + escapeHtml(s.answer) + '</div>';
+                    html += '<div class="review-score">Marks: <span class="score-badge ' + cls + '">' + s.overall + ' / 100</span> &mdash; Percentage: <span class="score-badge ' + cls + '">' + s.overall + '%</span></div>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
+            html += '<div class="report-section ai-recommendation">';
+            html += '<div class="rec-header">&#129302; Final Feedback</div>';
+            html += '<div class="rec-text">';
+            if (avgScore >= 80) {
+                html += 'Strong performance overall. Focus on refining your answers with more specific examples and measurable results to reach the next level.';
+            } else if (avgScore >= 60) {
+                html += 'Good foundation. Work on structuring your answers more clearly, especially using the STAR method for behavioral questions. Practice explaining technical concepts concisely.';
+            } else {
+                html += 'Keep practicing! Focus on structuring your answers, providing specific examples, and communicating more clearly. Consider practicing with the Practice mode first.';
+            }
+            if (improvements.length > 0) {
+                html += ' Suggested improvement focus areas: ' + improvements.join("; ") + '.';
+            }
+            html += '</div></div>';
+
+            document.getElementById("interviewReport").innerHTML = html;
+
+            console.log("Interview completed");
+            console.log("Answered questions:", mockScores.length, "Avg score:", avgScore);
+
+            var saved = await saveMockSession(avgScore, categoryTotals, categoryCounts, strengths, improvements);
+            var statusEl = document.getElementById("saveStatus");
+            if (statusEl) {
+                if (saved) {
+                    statusEl.innerHTML = '<div class="alert alert-success" style="margin-top:16px;">&#10003; Interview saved. View it on your <a href="/dashboard" style="text-decoration:underline;">Dashboard</a>.</div>';
+                } else {
+                    statusEl.innerHTML = '<div class="alert alert-error" style="margin-top:16px;">Could not save the interview. Please <a href="/login" style="text-decoration:underline;">log in</a> and try again.</div>';
+                }
+            }
+        }
+
+        async function saveMockSession(avgScore, categoryTotals, categoryCounts, strengths, improvements) {
+            var categoryAverages = {};
+            for (var cat in categoryTotals) {
+                categoryAverages[cat] = Math.round(categoryTotals[cat] / categoryCounts[cat]);
+            }
+
+            var details = mockScores.map(function(s) {
+                return {
+                    question: s.question,
+                    answer: s.answer,
+                    score: s.overall,
+                    scores: s.scores || {},
+                    category: document.getElementById("mockType").value,
+                    feedback: s.feedback || "",
+                    better_answer: s.better_answer || ""
+                };
+            });
+
+            var role = document.getElementById("mockRole").value;
+            var experience = document.getElementById("mockExperience").value;
+            var type = document.getElementById("mockType").value;
+
+            console.log("Saving mock interview session...");
+            console.log("user_id:", currentUserId, "questions:", mockScores.length, "avg_score:", avgScore);
+
+            try {
+                var res = await fetchWithTimeout("/save-interview", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        user_id: currentUserId,
+                        interview_type: type,
+                        overall_score: avgScore,
+                        questions_count: mockScores.length,
+                        communication: (typeof categoryAverages.communication === "number" ? categoryAverages.communication : 70),
+                        confidence: (typeof categoryAverages.confidence === "number" ? categoryAverages.confidence : 70),
+                        clarity: (typeof categoryAverages.clarity === "number" ? categoryAverages.clarity : 70),
+                        grammar: (typeof categoryAverages.grammar === "number" ? categoryAverages.grammar : 70),
+                        structure: (typeof categoryAverages.structure === "number" ? categoryAverages.structure : 70),
+                        relevance: (typeof categoryAverages.relevance === "number" ? categoryAverages.relevance : 70),
+                        details: details,
+                        strengths: strengths,
+                        improvements: improvements,
+                        role: role,
+                        experience: experience,
+                        difficulty: document.getElementById("mockDifficulty").value,
+                        overall_feedback: "Mock interview completed with " + mockScores.length + " question(s). Average score: " + avgScore + "/100."
+                    })
+                }, 60000);
+                var d = await res.json();
+                if (res.ok && d.success) {
+                    console.log("Mock interview session saved. Response:", d);
+                    return true;
+                }
+                console.error("Save mock session failed:", d);
+                return false;
+            } catch (e) {
+                console.error("Save mock session failed:", e);
+                return false;
+            }
+        }
+
+        function resetInterview() {
+            mockHistory = [];
+            mockScores = [];
+            mockIndex = 0;
+            currentMockQuestion = "";
+            showInterviewSection("interviewSetup");
+        }
+    </script>
+</body>
+</html>

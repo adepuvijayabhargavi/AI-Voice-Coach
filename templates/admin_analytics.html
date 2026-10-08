@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interview Analytics - AI Voice Coach Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand"><span>&#127908;</span> AI Voice Coach</a>
+            <button class="navbar-toggle" onclick="toggleNav()">&#9776;</button>
+            <ul class="navbar-nav">
+                <li><a href="{{ url_for('admin_dashboard') }}" class="{% if active_page == 'dashboard' %}active{% endif %}">Admin Dashboard</a></li>
+                <li><a href="{{ url_for('admin_users') }}" class="{% if active_page == 'users' %}active{% endif %}">Users</a></li>
+                <li><a href="{{ url_for('admin_analytics') }}" class="{% if active_page == 'analytics' %}active{% endif %}">Analytics</a></li>
+                <li><a href="{{ url_for('admin_reports') }}" class="{% if active_page == 'reports' %}active{% endif %}">System Reports</a></li>
+                {% if user %}
+                <li class="navbar-user">
+                    <span class="user-name">&#128081; {{ user.full_name }} (Admin)</span>
+                    <a href="/logout" class="btn btn-outline btn-sm">Logout</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container page-content">
+
+        <div class="section-header">
+            <h2>&#128202; Interview Analytics</h2>
+            <p>System-wide analytics calculated from all saved interview data.</p>
+        </div>
+
+        {% set has_cats = data.cat_avgs and data.cat_avgs.values() | selectattr('avg') | list | length > 0 %}
+
+        <!-- SUMMARY CARDS -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">&#127942;</div>
+                <div class="stat-value">{% if summary.avg_overall is not none %}{{ summary.avg_overall }}{% else %}--{% endif %}</div>
+                <div class="stat-label">Average Score (All Users)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#128172;</div>
+                <div class="stat-value">
+                    {% if data.common_weak and data.common_weak[0] %}
+                    {% for key, label in categories %}{% if key == data.common_weak[0] %}{{ label }}{% endif %}{% endfor %}
+                    {% else %}--{% endif %}
+                </div>
+                <div class="stat-label">Most Common Weakest Area</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#127942;</div>
+                <div class="stat-value">
+                    {% if data.common_strong and data.common_strong[0] %}
+                    {% for key, label in categories %}{% if key == data.common_strong[0] %}{{ label }}{% endif %}{% endfor %}
+                    {% else %}--{% endif %}
+                </div>
+                <div class="stat-label">Most Common Strongest Area</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#128101;</div>
+                <div class="stat-value">{{ summary.total_users }}</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+        </div>
+
+        <!-- AVERAGE CATEGORY SCORES -->
+        <div class="card mb-3">
+            <div class="card-header">&#128202; Average Category Scores</div>
+            <div style="padding:20px;">
+                {% if has_cats %}
+                <div class="score-overview">
+                    {% for key, label in categories %}
+                    <div class="score-item">
+                        <div class="score-label">{{ label }}</div>
+                        {% if data.cat_avgs[key].avg is not none %}
+                        <div class="score-marks">{{ data.cat_avgs[key].avg }} / 100</div>
+                        <div class="score-pct">{{ data.cat_avgs[key].count }} session{{ 's' if data.cat_avgs[key].count != 1 else '' }}</div>
+                        {% else %}
+                        <div class="score-marks">--</div>
+                        <div class="score-pct">No data</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    <div class="score-item" style="border:2px solid var(--primary); background:#eef2ff;">
+                        <div class="score-label">Overall</div>
+                        {% if summary.avg_overall is not none %}
+                        <div class="score-marks" style="font-size:1.4rem;">{{ summary.avg_overall }} / 100</div>
+                        {% else %}
+                        <div class="score-marks">--</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted">No interview data available yet. Complete practice sessions or mock interviews to see analytics.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- CHARTS -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div class="card mb-3">
+                <div class="card-header">&#128200; Category Performance</div>
+                <div class="chart-container">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+            <div class="card mb-3">
+                <div class="card-header">&#128202; Interview Activity (Last 30 Days)</div>
+                <div class="chart-container">
+                    <canvas id="activityChart"></canvas>
+                </div>
+                <p class="text-center text-muted mt-1" id="activityEmpty" style="display:none;">No interview activity in the last 30 days.</p>
+            </div>
+            <div class="card mb-3">
+                <div class="card-header">&#128204; Most Common Weak Areas</div>
+                <div class="chart-container">
+                    <canvas id="weakChart"></canvas>
+                </div>
+            </div>
+            <div class="card mb-3">
+                <div class="card-header">&#128118; User Registration Trend (Last 30 Days)</div>
+                <div class="chart-container">
+                    <canvas id="regChart"></canvas>
+                </div>
+                <p class="text-center text-muted mt-1" id="regEmpty" style="display:none;">No new users in the last 30 days.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        var catLabels = {
+            'communication': 'Communication',
+            'confidence': 'Confidence',
+            'clarity': 'Clarity',
+            'grammar': 'Grammar',
+            'structure': 'Structure',
+            'relevance': 'Relevance'
+        };
+
+        var catAvgs = {{ (data.cat_avgs or {}) | tojson }};
+        var weakDist = {{ (data.weak_dist or {}) | tojson }};
+        var strongDist = {{ (data.strong_dist or {}) | tojson }};
+        var activity = {{ (data.activity or []) | tojson }};
+        var registrations = {{ (data.registrations or []) | tojson }};
+
+        function buildLabels(dict) {
+            return Object.keys(dict).filter(function(k) { return k in catLabels; })
+                .map(function(k) { return catLabels[k]; });
+        }
+        function buildValues(dict, field) {
+            return Object.keys(dict).filter(function(k) { return k in catLabels; })
+                .map(function(k) { return dict[k][field] !== null && dict[k][field] !== undefined ? dict[k][field] : 0; });
+        }
+
+        // Category performance bar chart
+        var catKeys = Object.keys(catAvgs).filter(function(k) { return k in catLabels; });
+        (function() {
+            var ctx = document.getElementById("categoryChart").getContext("2d");
+            new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: catKeys.map(function(k) { return catLabels[k]; }),
+                    datasets: [{
+                        label: "Average Score",
+                        data: catKeys.map(function(k) { return catAvgs[k] && catAvgs[k].avg !== null ? catAvgs[k].avg : 0; }),
+                        backgroundColor: ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, max: 100 } }
+                }
+            });
+        })();
+
+        // Interview activity line chart
+        (function() {
+            var ctx = document.getElementById("activityChart").getContext("2d");
+            if (!activity || activity.length === 0) {
+                document.getElementById("activityEmpty").style.display = "block";
+                return;
+            }
+            new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: activity.map(function(r) { return r.d; }),
+                    datasets: [{
+                        label: "Interviews",
+                        data: activity.map(function(r) { return r.n; }),
+                        borderColor: "#4f46e5",
+                        backgroundColor: "rgba(79,70,229,0.1)",
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        })();
+
+        // Most common weak areas (horizontal bar)
+        (function() {
+            var ctx = document.getElementById("weakChart").getContext("2d");
+            var keys = Object.keys(weakDist).filter(function(k) { return k in catLabels; });
+            new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: keys.map(function(k) { return catLabels[k]; }),
+                    datasets: [{
+                        label: "Interviews where this was the weakest area",
+                        data: keys.map(function(k) { return weakDist[k]; }),
+                        backgroundColor: "#ef4444"
+                    }]
+                },
+                options: {
+                    indexAxis: "y",
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+        })();
+
+        // Registration trend
+        (function() {
+            var ctx = document.getElementById("regChart").getContext("2d");
+            if (!registrations || registrations.length === 0) {
+                document.getElementById("regEmpty").style.display = "block";
+                return;
+            }
+            new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: registrations.map(function(r) { return r.d; }),
+                    datasets: [{
+                        label: "New Users",
+                        data: registrations.map(function(r) { return r.n; }),
+                        borderColor: "#10b981",
+                        backgroundColor: "rgba(16,185,129,0.1)",
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        })();
+    </script>
+</body>
+</html>

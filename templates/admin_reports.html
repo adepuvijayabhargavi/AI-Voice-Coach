@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Reports - AI Voice Coach Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand"><span>&#127908;</span> AI Voice Coach</a>
+            <button class="navbar-toggle" onclick="toggleNav()">&#9776;</button>
+            <ul class="navbar-nav">
+                <li><a href="{{ url_for('admin_dashboard') }}" class="{% if active_page == 'dashboard' %}active{% endif %}">Admin Dashboard</a></li>
+                <li><a href="{{ url_for('admin_users') }}" class="{% if active_page == 'users' %}active{% endif %}">Users</a></li>
+                <li><a href="{{ url_for('admin_analytics') }}" class="{% if active_page == 'analytics' %}active{% endif %}">Analytics</a></li>
+                <li><a href="{{ url_for('admin_reports') }}" class="{% if active_page == 'reports' %}active{% endif %}">System Reports</a></li>
+                {% if user %}
+                <li class="navbar-user">
+                    <span class="user-name">&#128081; {{ user.full_name }} (Admin)</span>
+                    <a href="/logout" class="btn btn-outline btn-sm">Logout</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container page-content">
+
+        <div class="section-header">
+            <h2>&#128196; System Reports</h2>
+            <p>All interviews across all users ({{ total }} total).</p>
+        </div>
+
+        <!-- SEARCH -->
+        <div class="card mb-3">
+            <div style="padding:16px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <form method="GET" action="/admin/reports" style="display:flex; gap:8px; flex:1; max-width:600px;">
+                    <input type="text" name="q" value="{{ q }}" placeholder="Search by user, email, interview type or role..." class="form-control">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </form>
+                {% if q %}
+                <a href="{{ url_for('admin_reports') }}" class="btn btn-outline btn-sm">Clear</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            {% if rows %}
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>User</th>
+                        <th>Type</th>
+                        <th>Target Role</th>
+                        <th>Score</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td>{{ row.id }}</td>
+                        <td><a href="/admin/user/{{ row.user_id }}">{{ row.full_name }}</a> <span class="text-muted" style="font-size:0.8rem;">({{ row.email }})</span></td>
+                        <td>{{ row.interview_type }}</td>
+                        <td>{{ row.role or '--' }}</td>
+                        <td><span class="score-badge {% if row.overall_score >= 80 %}high{% elif row.overall_score >= 60 %}medium{% else %}low{% endif %}">{{ row.overall_score }} / 100</span></td>
+                        <td>{{ row.created_at.strftime('%b %d, %Y %H:%M') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div style="padding:40px 20px; text-align:center;">
+                <p class="text-muted">{% if q %}No interviews match your search.{% else %}No interviews recorded yet.{% endif %}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- PAGINATION -->
+        {% if total_pages > 1 %}
+        <div style="display:flex; justify-content:center; gap:8px; margin-top:1.5rem; flex-wrap:wrap;">
+            {% set base = '/admin/reports?q=' ~ q %}
+            {% if page > 1 %}
+            <a href="{{ base }}&page={{ page - 1 }}" class="btn btn-outline btn-sm">&laquo; Prev</a>
+            {% endif %}
+            <span class="text-muted" style="align-self:center;">Page {{ page }} of {{ total_pages }}</span>
+            {% if page < total_pages %}
+            <a href="{{ base }}&page={{ page + 1 }}" class="btn btn-outline btn-sm">Next &raquo;</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

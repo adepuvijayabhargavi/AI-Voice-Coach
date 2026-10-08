@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detailed Report - AI Voice Coach</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand"><span>&#127908;</span> AI Voice Coach</a>
+            <button class="navbar-toggle" onclick="toggleNav()">&#9776;</button>
+            <ul class="navbar-nav">
+                <li><a href="/">Home</a></li>
+                <li><a href="/practice">Practice</a></li>
+                <li><a href="/mock-interview">Mock Interview</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="/reports" class="active">Reports</a></li>
+                <li><a href="/improvement-plan">Improvement Plan</a></li>
+                {% if session.get('role') == 'admin' %}
+                <li><a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a></li>
+                {% endif %}
+                {% if user %}
+                <li class="navbar-user">
+                    <span class="user-name">&#128100; {{ user.full_name }}</span>
+                    <a href="/logout" class="btn btn-outline btn-sm">Logout</a>
+                </li>
+                {% else %}
+                <li class="navbar-auth">
+                    <a href="/login" class="btn btn-outline btn-sm">Login</a>
+                    <a href="/signup" class="btn btn-primary btn-sm">Sign Up</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container page-content">
+
+        <div class="section-header">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+                <div>
+                    <a href="/reports" class="btn btn-outline btn-sm" style="margin-bottom: 8px;">&#8592; Back to Reports</a>
+                    <h2>Detailed Interview Report</h2>
+                    {% if interview %}
+                    <p>{{ interview.interview_type | replace('_', ' ') | title }} &mdash; {{ interview.created_at.strftime('%d %b %Y at %H:%M') }}</p>
+                    {% endif %}
+                </div>
+                {% if interview %}
+                <a href="/reports/{{ interview.id }}/pdf" class="btn btn-primary" style="margin-bottom:8px;">
+                    &#128196; Download PDF Report
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if error %}
+        <div class="card">
+            <div class="text-center text-muted" style="padding: 40px;">
+                <p>&#128533; Unable to load your interview report. Please try again.</p>
+                <p style="font-size:0.85rem;margin-top:4px;">{{ error }}</p>
+                <a href="/reports" class="btn btn-primary mt-2">View All Reports</a>
+            </div>
+        </div>
+
+        {% elif interview %}
+
+        <!-- OVERALL SCORE -->
+        <div class="card report-block">
+            <div class="card-header">&#127942; Overall Interview Score</div>
+            <div class="text-center" style="padding: 30px;">
+                <div class="report-marks">{{ interview.overall_score }} / 100</div>
+                <div class="report-pct">{{ interview.overall_score }}%</div>
+                <div class="text-muted" style="margin-top: 8px;">{{ interview.interview_type | replace('_', ' ') | title }}</div>
+            </div>
+        </div>
+
+        <!-- CATEGORY SCORES -->
+        <div class="card report-block">
+            <div class="card-header">&#128200; Category Scores</div>
+            <div class="score-overview">
+                {% set categories = [
+                    ('Technical Knowledge', interview.relevance),
+                    ('Communication', interview.communication),
+                    ('Confidence', interview.confidence),
+                    ('Clarity', interview.clarity),
+                    ('Answer Structure', interview.structure),
+                    ('Grammar', interview.grammar)
+                ] %}
+                {% for name, score in categories %}
+                <div class="score-item">
+                    <div class="score-label">{{ name }}</div>
+                    {% if score is not none %}
+                    <div class="score-marks {{ 'high' if score >= 80 else ('medium' if score >= 60 else 'low') }}">{{ score }} / 100</div>
+                    <div class="score-pct">{{ score }}%</div>
+                    {% else %}
+                    <div class="score-marks">-- / 100</div>
+                    <div class="score-pct">--</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- SCORE CHART -->
+        <div class="card report-block">
+            <div class="card-header">&#128202; Score Chart</div>
+            <div style="padding: 20px;">
+                {% set chart_cats = [
+                    ('Technical Knowledge', interview.relevance),
+                    ('Communication', interview.communication),
+                    ('Confidence', interview.confidence),
+                    ('Clarity', interview.clarity),
+                    ('Answer Structure', interview.structure),
+                    ('Grammar', interview.grammar)
+                ] %}
+                <div class="score-bars">
+                    {% for name, score in chart_cats %}
+                    {% if score is not none %}
+                    <div class="score-bar-row">
+                        <div class="score-bar-label">{{ name }}</div>
+                        <div class="score-bar-track">
+                            <div class="score-bar-fill {{ 'high' if score >= 80 else ('medium' if score >= 60 else 'low') }}" style="width: {{ score if score <= 100 else 100 }}%;"></div>
+                        </div>
+                        <div class="score-bar-value">{{ score }}</div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- OVERALL FEEDBACK -->
+        <div class="card report-block">
+            <div class="card-header">&#128172; Overall Feedback</div>
+            {% if interview.overall_feedback %}
+            <div class="feedback-body" style="padding: 20px;">{{ interview.overall_feedback }}</div>
+            {% else %}
+            <div style="padding: 20px;" class="text-muted">No overall feedback was recorded for this interview.</div>
+            {% endif %}
+        </div>
+
+        <!-- STRENGTHS -->
+        <div class="card report-block">
+            <div class="card-header">&#127775; Your Strengths</div>
+            <div style="padding: 20px;">
+                {% if interview.strengths %}
+                <ul class="strengths-list">
+                    {% for s in interview.strengths %}
+                    <li>{{ s }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">No strengths were recorded for this interview.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- AREAS FOR IMPROVEMENT -->
+        <div class="card report-block">
+            <div class="card-header">&#128270; Areas for Improvement</div>
+            <div style="padding: 20px;">
+                {% if interview.improvements %}
+                <ul class="improvements-list">
+                    {% for s in interview.improvements %}
+                    <li>{{ s }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">No improvement areas were recorded for this interview.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- INTERVIEW SUMMARY -->
+        <div class="card report-block">
+            <div class="card-header">&#128220; Interview Summary</div>
+            <div style="padding: 20px;">
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <div class="summary-item-label">Role</div>
+                        <div class="summary-item-value">{{ interview.role.replace('_', ' ') | title if interview.role else 'General' }}</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-item-label">Experience</div>
+                        <div class="summary-item-value">{{ interview.experience.replace('_', ' ') | title if interview.experience else 'Not specified' }}</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-item-label">Interview Type</div>
+                        <div class="summary-item-value">{{ interview.interview_type.replace('_', ' ') | capitalize }}</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-item-label">Difficulty</div>
+                        <div class="summary-item-value">{{ interview.difficulty.replace('_', ' ') | title if interview.difficulty else 'Not specified' }}</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-item-label">Questions</div>
+                        <div class="summary-item-value">{{ interview.questions_count }}</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-item-label">Completed</div>
+                        <div class="summary-item-value">Yes</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-item-label">Date</div>
+                        <div class="summary-item-value">{{ interview.created_at.strftime('%d %b %Y at %H:%M') }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QUESTION-BY-QUESTION REVIEW -->
+        <div class="card report-block">
+            <div class="card-header">&#128203; Question-by-Question Report</div>
+            <div style="padding: 20px;">
+                {% if interview.details %}
+                    {% for d in interview.details %}
+                    <div class="review-item">
+                        <div class="review-question">
+                            <strong>Question {{ loop.index }}</strong>
+                            {% if d.category %}<span class="text-muted" style="font-weight:400;"> [{{ d.category }}]</span>{% endif %}
+                            <div style="margin-top:4px;font-weight:500;">{{ d.question }}</div>
+                        </div>
+                        <div class="review-answer-label">Your Answer</div>
+                        <div class="review-answer">{{ d.answer }}</div>
+                        {% if d.score is not none %}
+                        <div class="review-score" style="margin-top:8px;">
+                            <span class="score-badge {{ 'high' if d.score >= 80 else ('medium' if d.score >= 60 else 'low') }}">{{ d.score }} / 100</span>
+                        </div>
+                        {% endif %}
+                        {% if d.feedback %}
+                        <div class="review-answer-label" style="margin-top:14px;">AI Feedback</div>
+                        <div class="review-answer" style="white-space:pre-line;">{{ d.feedback }}</div>
+                        {% endif %}
+                        {% if d.better_answer %}
+                        <div class="review-answer-label" style="margin-top:14px;">Improved Answer</div>
+                        <div class="review-answer" style="white-space:pre-line;">{{ d.better_answer }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <p class="text-muted">No per-question details were recorded for this interview.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- DOWNLOAD PDF -->
+        <div class="card report-block">
+            <div class="card-header">&#128196; Download Report</div>
+            <div style="padding: 20px;" class="text-center">
+                <a href="/reports/{{ interview.id }}/pdf" class="btn btn-primary btn-lg">
+                    &#128196; Download PDF Report
+                </a>
+                <p class="text-muted" style="margin-top:8px;">
+                    Save a professional PDF copy of this session, including scores, feedback and question details.
+                </p>
+            </div>
+        </div>
+
+        {% else %}
+        <div class="card">
+            <div class="text-center text-muted" style="padding: 40px;">
+                <p>&#128533; Unable to load your interview report. Please try again.</p>
+                <a href="/reports" class="btn btn-primary mt-2">View All Reports</a>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

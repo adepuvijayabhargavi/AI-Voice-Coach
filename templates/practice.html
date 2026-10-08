@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Practice - AI Voice Coach</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand"><span>&#127908;</span> AI Voice Coach</a>
+            <button class="navbar-toggle" onclick="toggleNav()">&#9776;</button>
+            <ul class="navbar-nav">
+                <li><a href="/">Home</a></li>
+                <li><a href="/practice" class="active">Practice</a></li>
+                <li><a href="/mock-interview">Mock Interview</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="/reports">Reports</a></li>
+                <li><a href="/improvement-plan">Improvement Plan</a></li>
+                {% if session.get('role') == 'admin' %}
+                <li><a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a></li>
+                {% endif %}
+                {% if user %}
+                <li class="navbar-user">
+                    <span class="user-name">&#128100; {{ user.full_name }}</span>
+                    <a href="/logout" class="btn btn-outline btn-sm">Logout</a>
+                </li>
+                {% else %}
+                <li class="navbar-auth">
+                    <a href="/login" class="btn btn-outline btn-sm">Login</a>
+                    <a href="/signup" class="btn btn-primary btn-sm">Sign Up</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container page-content">
+
+        <div class="section-header">
+            <h2>Practice Mode</h2>
+            <p>Configure your practice session and start improving</p>
+        </div>
+
+        <!-- SESSION SETTINGS -->
+        <div class="card mb-3" id="practiceSetup">
+            <div class="card-header">&#9881; Session Settings</div>
+            <div class="settings-grid">
+                <div class="form-group">
+                    <label>Interview Type</label>
+                    <select id="interviewType" class="form-control">
+                        <option value="hr" {{ 'selected' if interview_type == 'hr' else '' }}>HR Interview</option>
+                        <option value="technical" {{ 'selected' if interview_type == 'technical' else '' }}>Technical</option>
+                        <option value="behavioral" {{ 'selected' if interview_type == 'behavioral' else '' }}>Behavioral</option>
+                        <option value="communication" {{ 'selected' if interview_type == 'communication' else '' }}>Communication</option>
+                        <option value="general">General Interview</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Target Role</label>
+                    <select id="targetRole" class="form-control">
+                        <option value="software_developer">Software Developer</option>
+                        <option value="python_developer">Python Developer</option>
+                        <option value="full_stack_developer">Full Stack Developer</option>
+                        <option value="frontend_developer">Frontend Developer</option>
+                        <option value="backend_developer">Backend Developer</option>
+                        <option value="data_analyst">Data Analyst</option>
+                        <option value="ml_engineer">Machine Learning Engineer</option>
+                        <option value="ai_ml_engineer">AI/ML Engineer</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Experience Level</label>
+                    <select id="experienceLevel" class="form-control">
+                        <option value="fresher">Fresher</option>
+                        <option value="intermediate">Intermediate</option>
+                        <option value="experienced">Experienced</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Difficulty</label>
+                    <select id="difficulty" class="form-control">
+                        <option value="beginner">Beginner</option>
+                        <option value="intermediate">Intermediate</option>
+                        <option value="advanced">Advanced</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Number of Questions</label>
+                    <select id="questionCount" class="form-control">
+                        <option value="5">5 Questions</option>
+                        <option value="10" selected>10 Questions</option>
+                        <option value="20">20 Questions</option>
+                        <option value="30">30 Questions</option>
+                        <option value="50">50 Questions</option>
+                        <option value="100">100 Questions</option>
+                    </select>
+                </div>
+            </div>
+            <div class="text-center mt-3">
+                <button onclick="startPractice()" class="btn btn-primary btn-lg" id="startPracticeBtn">Start Practice</button>
+            </div>
+        </div>
+
+        <!-- LOADING -->
+        <div class="card mb-3 hidden" id="practiceLoading">
+            <div class="text-center" style="padding:3rem;">
+                <div class="spinner" style="margin:0 auto 1rem;"></div>
+                <p class="text-muted" id="practiceLoadingText">Generating interview questions...</p>
+            </div>
+        </div>
+
+        <!-- QUESTION CARD -->
+        <div class="card mb-3 hidden" id="practiceActive">
+            <div class="question-display">
+                <div class="question-label">Question <span id="qNum">1</span> / <span id="qTotal">10</span></div>
+                <div class="question-text" id="currentQuestion">Loading question...</div>
+                <button id="hearQuestionBtn" onclick="hearQuestion()" class="btn btn-outline btn-sm" style="margin-top:0.75rem;">&#128266; Hear Question</button>
+            </div>
+            <div class="question-nav">
+                <button id="prevBtn" onclick="navigateQuestion(-1)" class="btn btn-outline" disabled>&larr; Previous Question</button>
+                <button id="nextBtn" onclick="handleNextQuestion()" class="btn btn-outline">Next Question &rarr;</button>
+            </div>
+        </div>
+
+        <!-- SPEAKING -->
+        <div class="card mb-3 hidden" id="speakingCard">
+            <div class="text-center mt-2">
+                <button id="startBtn" onclick="practiceToggleSpeech()" class="btn btn-primary btn-lg">
+                    &#127908; Start Speaking
+                </button>
+            </div>
+            <p id="status" class="text-center mt-2 text-muted">Click the button and start speaking.</p>
+            <h5 class="mt-3">Your Answer</h5>
+            <div id="transcript" class="transcript-box empty">Your speech will appear here...</div>
+            <div class="text-center mt-3">
+                <button id="analyzeBtn" onclick="analyzeAnswer()" class="btn btn-success btn-lg">
+                    &#129302; Analyze My Answer
+                </button>
+            </div>
+            <div id="loading" class="loading-overlay">
+                <div class="spinner"></div>
+                <p>Analyzing your answer...</p>
+            </div>
+            <div id="analysisResult"></div>
+        </div>
+
+        <!-- SESSION COMPLETE -->
+        <div class="card hidden" id="practiceComplete">
+            <div class="card-header">&#127881; Practice Complete</div>
+            <div class="text-center mb-3">
+                <p class="text-muted">You completed <strong id="completedCount">0</strong> questions.</p>
+            </div>
+            <div id="practiceSummary"></div>
+            <div class="text-center mt-3">
+                <button onclick="viewPerformance()" class="btn btn-primary">View Performance</button>
+                <button onclick="practiceAgain()" class="btn btn-outline" style="margin-left:0.5rem;">Practice Again</button>
+            </div>
+        </div>
+
+        <!-- PERFORMANCE VIEW -->
+        <div class="hidden" id="performanceView">
+            <div id="performanceContent"></div>
+            <div class="text-center mt-3">
+                <button onclick="practiceAgain()" class="btn btn-primary">Practice Again</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        let questions = [];
+        let currentIndex = 0;
+        let totalQuestions = 0;
+        const answers = {};
+        const analyses = {};
+        const scores = {};
+        let currentQuestionText = "";
+        let sessionComplete = false;
+        let practiceSpeakTimer = null;
+
+        function showSection(id) {
+            ["practiceSetup", "practiceLoading", "practiceActive", "speakingCard", "practiceComplete", "performanceView"].forEach(function(s) {
+                var el = document.getElementById(s);
+                if (el) el.classList.add("hidden");
+            });
+            var el = document.getElementById(id);
+            if (el) el.classList.remove("hidden");
+        }
+
+        async function startPractice() {
+            var count = parseInt(document.getElementById("questionCount").value);
+            totalQuestions = count;
+            currentIndex = 0;
+            sessionComplete = false;
+            Object.keys(answers).forEach(function(k) { delete answers[k]; });
+            Object.keys(analyses).forEach(function(k) { delete analyses[k]; });
+            Object.keys(scores).forEach(function(k) { delete scores[k]; });
+
+            var startBtn = document.getElementById("startPracticeBtn");
+            if (startBtn) startBtn.disabled = true;
+
+            showSection("practiceLoading");
+            var loadingText = document.getElementById("practiceLoadingText");
+            if (loadingText) {
+                loadingText.innerText = "Generating " + count + " interview questions...";
+            }
+
+            var type = document.getElementById("interviewType").value;
+            var diff = document.getElementById("difficulty").value;
+
+            try {
+                var res = await fetch("/api/questions?type=" + type + "&difficulty=" + diff + "&count=" + count + "&role=" + encodeURIComponent(document.getElementById("targetRole").value) + "&experience=" + encodeURIComponent(document.getElementById("experienceLevel").value));
+                var data = await res.json();
+                questions = data.questions || [];
+                if (questions.length < count) {
+                    questions = questions.concat(Array(count - questions.length).fill("Tell me about yourself."));
+                }
+            } catch (e) {
+                questions = Array(count).fill("Tell me about yourself.");
+            } finally {
+                if (startBtn) startBtn.disabled = false;
+            }
+
+            document.getElementById("qTotal").innerText = totalQuestions;
+            showSection("practiceActive");
+            document.getElementById("speakingCard").classList.remove("hidden");
+            renderQuestion();
+        }
+
+        function renderQuestion() {
+            if (questions.length === 0) return;
+            currentQuestionText = questions[currentIndex];
+            document.getElementById("currentQuestion").innerText = currentQuestionText;
+            document.getElementById("qNum").innerText = currentIndex + 1;
+            document.getElementById("prevBtn").disabled = currentIndex === 0;
+            document.getElementById("nextBtn").disabled = currentIndex >= totalQuestions - 1;
+
+            var transcript = document.getElementById("transcript");
+            var resultDiv = document.getElementById("analysisResult");
+            if (transcript) {
+                transcript.innerText = answers[currentIndex] || "Your speech will appear here...";
+                if (answers[currentIndex]) {
+                    transcript.classList.remove("empty");
+                } else {
+                    transcript.classList.add("empty");
+                }
+            }
+            if (resultDiv) {
+                resultDiv.innerHTML = analyses[currentIndex] || "";
+            }
+
+            schedulePracticeSpeak();
+        }
+
+        function schedulePracticeSpeak() {
+            if (practiceSpeakTimer) { clearTimeout(practiceSpeakTimer); practiceSpeakTimer = null; }
+            practiceSpeakTimer = setTimeout(function() {
+                practiceSpeakTimer = null;
+                speakQuestion(currentQuestionText);
+            }, 150);
+        }
+
+        function hearQuestion() {
+            var q = document.getElementById("currentQuestion").innerText.trim();
+            console.log("Manual Hear Question clicked:", q);
+            speakQuestion(q);
+        }
+
+        function practiceToggleSpeech() {
+            stopSpeechTTS();
+            if (practiceSpeakTimer) { clearTimeout(practiceSpeakTimer); practiceSpeakTimer = null; }
+            toggleSpeech();
+        }
+
+        function navigateQuestion(direction) {
+            saveCurrentAnswer();
+            stopSpeech();
+            currentIndex += direction;
+            if (currentIndex < 0) currentIndex = 0;
+            if (currentIndex >= totalQuestions) currentIndex = totalQuestions - 1;
+            renderQuestion();
+        }
+
+        function saveCurrentAnswer() {
+            var transcript = document.getElementById("transcript");
+            if (transcript) {
+                var text = transcript.innerText.trim();
+                if (text && text !== "Your speech will appear here..." && text !== "Listening...") {
+                    answers[currentIndex] = text;
+                }
+            }
+        }
+
+        function stopSpeech() {
+            if (typeof recognition !== "undefined" && recognition && isListening) {
+                recognition.stop();
+            }
+        }
+
+        function getCurrentQuestion() {
+            return currentQuestionText;
+        }
+
+        function saveAnalysisForCurrentQuestion(html) {
+            analyses[currentIndex] = html;
+        }
+
+        function handleNextQuestion() {
+            saveCurrentAnswer();
+            stopSpeech();
+            if (currentIndex >= totalQuestions - 1) {
+                completeSession();
+            } else {
+                currentIndex++;
+                renderQuestion();
+            }
+        }
+
+        function completeSession() {
+            sessionComplete = true;
+            stopSpeechTTS();
+            if (practiceSpeakTimer) { clearTimeout(practiceSpeakTimer); practiceSpeakTimer = null; }
+            document.getElementById("completedCount").innerText = Object.keys(answers).length;
+            showSection("practiceComplete");
+            document.getElementById("speakingCard").classList.add("hidden");
+            buildSummary();
+            savePracticeSession();
+        }
+
+        function savePracticeSession() {
+            var scoredKeys = Object.keys(scores);
+            if (scoredKeys.length === 0) return;
+
+            var total = 0;
+            var categoryTotals = {};
+            var categoryCounts = {};
+            var allStrengths = [];
+            var allImprovements = [];
+
+            scoredKeys.forEach(function(k) {
+                var s = scores[k];
+                total += s.overall || 0;
+                if (s.scores) {
+                    for (var cat in s.scores) {
+                        categoryTotals[cat] = (categoryTotals[cat] || 0) + s.scores[cat];
+                        categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+                    }
+                }
+            });
+
+            var avgScore = Math.round(total / scoredKeys.length);
+
+            var categoryAverages = {};
+            for (var cat in categoryTotals) {
+                categoryAverages[cat] = Math.round(categoryTotals[cat] / categoryCounts[cat]);
+            }
+
+            for (var cat in categoryAverages) {
+                var label = cat.charAt(0).toUpperCase() + cat.slice(1);
+                if (categoryAverages[cat] >= 80) allStrengths.push(label + ": " + categoryAverages[cat] + "/100");
+                else if (categoryAverages[cat] < 70) allImprovements.push(label + ": " + categoryAverages[cat] + "/100");
+            }
+
+            var details = [];
+            for (var i = 0; i < totalQuestions; i++) {
+                if (questions[i] && answers[i]) {
+                    var item = { question: questions[i], answer: answers[i], category: document.getElementById("interviewType").value, score: null };
+                    if (scores[i]) {
+                        item.score = scores[i].overall;
+                        item.feedback = scores[i].ai_feedback || "";
+                        item.better_answer = scores[i].better_answer || "";
+                    }
+                    details.push(item);
+                }
+            }
+
+            var type = document.getElementById("interviewType").value;
+
+            fetch("/save-interview", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    interview_type: type,
+                    overall_score: avgScore,
+                    questions_count: scoredKeys.length,
+                    communication: (typeof categoryAverages.communication === "number" ? categoryAverages.communication : 70),
+                    confidence: (typeof categoryAverages.confidence === "number" ? categoryAverages.confidence : 70),
+                    clarity: (typeof categoryAverages.clarity === "number" ? categoryAverages.clarity : 70),
+                    grammar: (typeof categoryAverages.grammar === "number" ? categoryAverages.grammar : 70),
+                    structure: (typeof categoryAverages.structure === "number" ? categoryAverages.structure : 70),
+                    relevance: (typeof categoryAverages.relevance === "number" ? categoryAverages.relevance : 70),
+                    details: details,
+                    strengths: allStrengths,
+                    improvements: allImprovements,
+                    role: document.getElementById("targetRole").value,
+                    experience: document.getElementById("experienceLevel").value,
+                    difficulty: document.getElementById("difficulty").value,
+                    overall_feedback: "Practice session completed with " + scoredKeys.length + " question(s). Average score: " + avgScore + "/100."
+                })
+            }).then(function(r) { return r.json(); })
+              .then(function(d) { if (d.success) console.log("Practice session saved."); })
+              .catch(function(e) { console.error("Save practice session failed:", e); });
+        }
+
+        function buildSummary() {
+            var answered = Object.keys(answers).length;
+            var scoredKeys = Object.keys(scores);
+            var avgScore = 0;
+            var categoryTotals = {};
+            var categoryCounts = {};
+
+            if (scoredKeys.length > 0) {
+                var total = 0;
+                scoredKeys.forEach(function(k) {
+                    var s = scores[k];
+                    total += s.overall || 0;
+                    if (s.scores) {
+                        for (var cat in s.scores) {
+                            categoryTotals[cat] = (categoryTotals[cat] || 0) + s.scores[cat];
+                            categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+                        }
+                    }
+                });
+                avgScore = Math.round(total / scoredKeys.length);
+            }
+
+            var avgByCategory = {};
+            for (var cat in categoryTotals) {
+                avgByCategory[cat] = Math.round(categoryTotals[cat] / categoryCounts[cat]);
+            }
+
+            var strongest = "";
+            var strongestVal = 0;
+            var weakest = "";
+            var weakestVal = 100;
+            for (var cat in avgByCategory) {
+                if (avgByCategory[cat] > strongestVal) {
+                    strongestVal = avgByCategory[cat];
+                    strongest = cat.charAt(0).toUpperCase() + cat.slice(1);
+                }
+                if (avgByCategory[cat] < weakestVal) {
+                    weakestVal = avgByCategory[cat];
+                    weakest = cat.charAt(0).toUpperCase() + cat.slice(1);
+                }
+            }
+
+            var catLabels = {
+                communication: "Communication",
+                confidence: "Confidence",
+                clarity: "Clarity",
+                grammar: "Grammar",
+                relevance: "Relevance",
+                structure: "Structure",
+                technical_knowledge: "Technical"
+            };
+
+            var html = '<div class="summary-grid">';
+            html += '<div class="summary-stat"><div class="summary-value">' + answered + '/' + totalQuestions + '</div><div class="summary-label">Questions Answered</div></div>';
+            html += '<div class="summary-stat"><div class="summary-value">' + (scoredKeys.length > 0 ? avgScore + ' / 100' : 'N/A') + '</div><div class="summary-label">Marks</div></div>';
+            html += '<div class="summary-stat"><div class="summary-value">' + (scoredKeys.length > 0 ? avgScore + '%' : 'N/A') + '</div><div class="summary-label">Percentage</div></div>';
+            html += '</div>';
+
+            if (scoredKeys.length > 0) {
+                html += '<div class="summary-scores">';
+                for (var cat in avgByCategory) {
+                    var label = catLabels[cat] || cat;
+                    var val = avgByCategory[cat];
+                    var cls = val >= 80 ? "high" : val >= 60 ? "medium" : "low";
+                    html += '<div class="summary-score-item"><div class="summary-score-label">' + label + '</div><div class="summary-score-value ' + cls + '">' + val + ' / 100</div><div class="summary-score-value ' + cls + '">' + val + '%</div></div>';
+                }
+                html += '</div>';
+
+                html += '<div class="summary-details">';
+                if (strongest) {
+                    html += '<div class="summary-detail"><span class="summary-detail-title">Strongest Area:</span> ' + strongest + ' (' + strongestVal + ' / 100, ' + strongestVal + '%)</div>';
+                }
+                if (weakest && weakest !== strongest) {
+                    html += '<div class="summary-detail"><span class="summary-detail-title">Needs Improvement:</span> ' + weakest + ' (' + weakestVal + ' / 100, ' + weakestVal + '%)</div>';
+                }
+                html += '</div>';
+            }
+
+            document.getElementById("practiceSummary").innerHTML = html;
+        }
+
+        function viewPerformance() {
+            showSection("performanceView");
+            document.getElementById("speakingCard").classList.add("hidden");
+            var content = document.getElementById("performanceContent");
+            var html = '<div class="card mb-3"><div class="card-header">Question Review</div>';
+            for (var i = 0; i < totalQuestions; i++) {
+                var q = questions[i] || "";
+                var a = answers[i] || "Not answered";
+                var analysisHtml = analyses[i] || "";
+                html += '<div class="review-item">';
+                html += '<div class="review-question"><strong>Q' + (i + 1) + ':</strong> ' + escapeHtml(q) + '</div>';
+                html += '<div class="review-answer">' + escapeHtml(a) + '</div>';
+                if (analysisHtml) {
+                    html += '<div class="review-analysis">' + analysisHtml + '</div>';
+                }
+                html += '</div>';
+            }
+            html += '</div>';
+            content.innerHTML = html;
+        }
+
+        function practiceAgain() {
+            currentIndex = 0;
+            sessionComplete = false;
+            stopSpeechTTS();
+            if (practiceSpeakTimer) { clearTimeout(practiceSpeakTimer); practiceSpeakTimer = null; }
+            Object.keys(answers).forEach(function(k) { delete answers[k]; });
+            Object.keys(analyses).forEach(function(k) { delete analyses[k]; });
+            Object.keys(scores).forEach(function(k) { delete scores[k]; });
+            questions = [];
+            showSection("practiceSetup");
+        }
+
+        document.getElementById("interviewType").addEventListener("change", function() {});
+
+        document.addEventListener("DOMContentLoaded", function() {
+            showSection("practiceSetup");
+        });
+    </script>
+</body>
+</html>

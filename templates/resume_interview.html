@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume-Based Interview - AI Voice Coach</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .resume-context {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            font-size: 0.85rem;
+        }
+        .resume-context h4 {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .resume-context .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+        .resume-context .tag {
+            background: var(--primary);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+        .question-category {
+            display: inline-block;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        .loading-overlay.active { display: flex; }
+        .loading-box {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 4px solid var(--border);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .hidden { display: none !important; }
+        .no-resume-msg {
+            background: #FEF3C7;
+            border: 1px solid #F59E0B;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            color: #92400E;
+        }
+        .error-msg {
+            background: #FEE2E2;
+            border: 1px solid #F87171;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            color: #991B1B;
+        }
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            justify-content: center;
+        }
+        .nav-buttons .btn { flex: 1; max-width: 200px; }
+
+        /* ===== Resume upload / setup styles ===== */
+        .upload-card {
+            background: var(--card-bg);
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            transition: border-color 0.3s;
+        }
+        .upload-card:hover { border-color: var(--primary); }
+        .upload-area { cursor: pointer; }
+        .upload-area .icon { font-size: 3rem; margin-bottom: 16px; }
+        .upload-area h3 { font-size: 1.1rem; color: var(--text); margin-bottom: 8px; }
+        .upload-area p { color: var(--text-muted); font-size: 0.9rem; }
+        .formats { display: flex; gap: 12px; justify-content: center; margin-top: 16px; }
+        .format-badge {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+        .page-header { margin-bottom: 16px; }
+        .page-title { font-size: 1.5rem; margin: 0 0 4px; }
+        .page-subtitle { color: var(--text-muted); font-size: 0.95rem; margin: 0; }
+        .analysis-result { display: none; }
+        .analysis-section {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .analysis-section h4 {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .skill-tag {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            margin: 3px;
+            font-weight: 500;
+        }
+        .project-item { padding: 8px 0; border-bottom: 1px solid var(--border); }
+        .project-item:last-child { border-bottom: none; }
+        .project-name { font-weight: 600; color: var(--text); font-size: 0.95rem; }
+        .project-tech { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+        .project-desc { font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; }
+        .exp-item { padding: 8px 0; }
+        .exp-title { font-weight: 600; font-size: 0.95rem; }
+        .exp-company { font-size: 0.85rem; color: var(--primary); }
+        .exp-duration { font-size: 0.8rem; color: var(--text-muted); }
+        .edu-item { padding: 6px 0; }
+        .edu-degree { font-weight: 600; font-size: 0.95rem; }
+        .edu-inst { font-size: 0.85rem; color: var(--text-muted); }
+        .setup-form { display: none; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+        }
+        .form-group select, .form-group input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.95rem;
+            outline: none;
+        }
+        .form-group select:focus, .form-group input:focus { border-color: var(--primary); }
+        .inline-group { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .question-count-group { display: flex; gap: 8px; margin-top: 6px; }
+        .question-count-group input[type="radio"] { display: none; }
+        .question-count-group label.count-label {
+            padding: 8px 18px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .question-count-group input[type="radio"]:checked + label.count-label {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .error-box {
+            background: #FEE2E2;
+            border: 1px solid #F87171;
+            color: #991B1B;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin: 12px 0;
+            display: none;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container page-content">
+
+        <div class="section-header">
+            <h2>Resume-Based Interview</h2>
+            <p>Questions personalized based on your uploaded resume</p>
+        </div>
+
+        <!-- ===== SINGLE RESUME UPLOAD (one file, one backend call) ===== -->
+        <div id="uploadCard">
+            <div class="card" style="padding:24px;">
+                <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                    <div class="icon">&#128196;</div>
+                    <h3>Choose Resume</h3>
+                    <p>Drag and drop or click to browse</p>
+                    <div class="formats">
+                        <span class="format-badge">PDF</span>
+                        <span class="format-badge">DOCX</span>
+                        <span class="format-badge">TXT</span>
+                    </div>
+                    <p style="margin-top:12px; font-size:0.8rem; color:var(--text-muted);">Maximum file size: 5 MB</p>
+                </div>
+                <input type="file" id="fileInput" accept=".pdf,.docx,.txt" style="display:none" onchange="handleFileSelect(this)">
+
+                <div id="fileInfo" style="display:none; margin-top:12px; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:12px 16px; align-items:center; gap:12px;">
+                    <span id="fileIcon" style="font-size:1.5rem;"></span>
+                    <div style="flex:1;">
+                        <div id="fileName" style="font-weight:600; font-size:0.9rem; word-break:break-word;"></div>
+                        <div id="fileSize" style="font-size:0.8rem; color:var(--text-muted);"></div>
+                    </div>
+                    <button onclick="clearFile()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.2rem;">&#10005;</button>
+                </div>
+
+                <div class="setup-form" style="margin-top:16px;">
+                    <div class="form-group">
+                        <label>Target Role</label>
+                        <select id="setupRole">
+                            {% for key, name in roles.items() %}
+                            <option value="{{ key }}">{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="inline-group">
+                        <div class="form-group">
+                            <label>Experience Level</label>
+                            <select id="setupExp">
+                                <option value="fresher">Fresher</option>
+                                <option value="junior">Junior (1-3 yrs)</option>
+                                <option value="mid">Mid (3-6 yrs)</option>
+                                <option value="senior">Senior (6+ yrs)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Number of Questions</label>
+                            <select id="setupCount">
+                                <option value="5">5</option>
+                                <option value="10" selected>10</option>
+                                <option value="15">15</option>
+                                <option value="20">20</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="processBtn" class="btn btn-primary" style="width:100%; margin-top:16px; display:none;" onclick="processResume()">
+                    Process Resume
+                </button>
+                <div id="processError" class="error-box"></div>
+            </div>
+        </div>
+
+        <!-- GENERATED QUESTIONS ARE STORED INTERNALLY ONLY (never displayed as a list).
+             The interview begins automatically, showing one question at a time. -->
+
+        <!-- INTERVIEW IN PROGRESS -->
+        <div class="card mb-3 hidden" id="interviewActive">
+            <div class="card-header">
+                <span>&#128188; Resume-Based Interview</span>
+                <span style="margin-left:auto;font-size:0.85rem;color:var(--text-muted);">
+                    Question <span id="qNum">1</span> / <span id="qTotal">10</span>
+                </span>
+            </div>
+
+            <!-- Resume Context -->
+            <div id="resumeContext" class="resume-context" style="margin:16px 16px 0;">
+                <h4>Resume Context</h4>
+                <div id="resumeTags" class="tags"></div>
+            </div>
+
+            <div style="padding:16px;">
+                <div id="questionCategory" class="question-category">General</div>
+                <div class="question-display">
+                    <div class="question-text" id="questionText">Loading...</div>
+                </div>
+
+                <!-- Question navigation (Previous / Next) directly below the question -->
+                <div class="nav-buttons" style="margin-top:12px;">
+                    <button id="prevBtn" onclick="prevQuestion()" class="btn btn-outline" disabled>&#9664; Previous</button>
+                    <button id="nextBtn" onclick="nextQuestion()" class="btn btn-outline">Next &#9654;</button>
+                </div>
+
+                <div class="text-center mt-2">
+                    <button id="startBtn" onclick="toggleSpeech()" class="btn btn-primary btn-lg">
+                        &#127908; Start Speaking
+                    </button>
+                </div>
+                <p id="status" class="text-center mt-2 text-muted">Click the button and start speaking.</p>
+
+                <h5 class="mt-3">Your Answer</h5>
+                <div id="transcript" class="transcript-box empty">Your speech will appear here...</div>
+
+                <div class="text-center mt-3">
+                    <button id="submitBtn" onclick="submitAnswer()" class="btn btn-success btn-lg">
+                        Submit Answer
+                    </button>
+                </div>
+
+                <div class="loading-overlay" id="evalLoading">
+                    <div class="loading-box">
+                        <div class="spinner"></div>
+                        <p style="font-weight:600;">Evaluating your answer...</p>
+                    </div>
+                </div>
+
+                <div id="feedback" class="mt-3"></div>
+            </div>
+        </div>
+
+        <!-- INTERVIEW COMPLETE -->
+        <div class="card hidden" id="interviewComplete">
+            <div class="card-header">&#127881; Interview Complete</div>
+            <div id="report"></div>
+            <div class="text-center mt-3">
+                <a href="/dashboard" class="btn btn-primary">View Dashboard</a>
+                <a href="/reports" class="btn btn-outline" style="margin-left:0.5rem;">View Reports</a>
+                <button onclick="goHome()" class="btn btn-outline" style="margin-left:0.5rem;">Start New Interview</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-box">
+            <div class="spinner"></div>
+            <p id="loadingText" style="font-weight:600; margin:0;">Analyzing...</p>
+            <p id="loadingSub" style="color:var(--text-muted); font-size:0.85rem; margin:8px 0 0;"></p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        // ===== Resume upload / analysis / setup state =====
+        var resumeData = null;
+
+        function showUpload() {
+            var cards = ['interviewActive', 'interviewComplete'];
+            for (var i = 0; i < cards.length; i++) {
+                var el = document.getElementById(cards[i]);
+                if (el) el.classList.add('hidden');
+            }
+            document.getElementById('uploadCard').classList.remove('hidden');
+            clearFile();
+        }
+
+        function showLoading(text, sub) {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingSub').textContent = sub || '';
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+        function showError(id, msg) {
+            const el = document.getElementById(id);
+            if (el) { el.textContent = msg; el.style.display = 'block'; }
+        }
+        function hideError(id) {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        }
+
+        function handleFileSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (!['pdf', 'docx', 'txt'].includes(ext)) {
+                alert('Please upload a valid PDF, DOCX or TXT file.');
+                input.value = '';
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File too large. Maximum size is 5 MB.');
+                input.value = '';
+                return;
+            }
+
+            const icons = { pdf: '&#128196;', docx: '&#128209;', txt: '&#128196;' };
+            document.getElementById('fileIcon').innerHTML = icons[ext] || '&#128196;';
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = (file.size / 1024).toFixed(1) + ' KB';
+            document.getElementById('fileInfo').style.display = 'flex';
+            document.getElementById('processBtn').style.display = 'block';
+            hideError('processError');
+        }
+
+        function clearFile() {
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('processBtn').style.display = 'none';
+        }
+
+        // Single flow: one upload -> one backend call (/api/resume/process) which
+        // extracts text, analyzes the resume AND generates personalized questions.
+        async function processResume() {
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files[0]) {
+                showError('processError', 'Please choose a resume file first.');
+                return;
+            }
+
+            const processBtn = document.getElementById('processBtn');
+            const originalLabel = 'Process Resume';
+            processBtn.disabled = true;
+            processBtn.textContent = 'Processing...';
+
+            hideError('processError');
+            showLoading('Processing your resume...', 'Extracting text and generating personalized questions...');
+
+            const formData = new FormData();
+            formData.append('resume_file', fileInput.files[0]);
+            formData.append('role', document.getElementById('setupRole').value);
+            formData.append('experience', document.getElementById('setupExp').value);
+            formData.append('count', document.getElementById('setupCount').value);
+
+            console.log("[ResumeInterview] processResume request: file=" + fileInput.files[0].name +
+                        " role=" + document.getElementById('setupRole').value +
+                        " experience=" + document.getElementById('setupExp').value +
+                        " count=" + document.getElementById('setupCount').value);
+
+            try {
+                const res = await fetch('/api/resume/process', { method: 'POST', body: formData });
+                let data;
+                try {
+                    data = await res.json();
+                } catch (parseErr) {
+                    processBtn.disabled = false;
+                    processBtn.textContent = originalLabel;
+                    hideLoading();
+                    console.error("[ResumeInterview] /api/resume/process returned non-JSON:", res.status);
+                    showError('processError', 'Server error while processing the resume. Please try again.');
+                    return;
+                }
+                hideLoading();
+                processBtn.disabled = false;
+                processBtn.textContent = originalLabel;
+
+                console.log("[ResumeInterview] API response:", data);
+                console.log("Resume text length:", (data && data.text_length) || (data.analysis ? JSON.stringify(data.analysis).length : 0));
+
+                if (!res.ok || data.error) {
+                    const reason = data && data.error ? data.error : ('Server error (' + res.status + ')');
+                    console.error("[ResumeInterview] processResume failed:", res.status, reason, data);
+                    showError('processError', friendlyError(data));
+                    return;
+                }
+
+                resumeData = data.analysis;
+                pendingQuestions = normalizeQuestions(data.questions);
+                console.log("Questions received:", pendingQuestions.length, pendingQuestions);
+                dbg('processResume', 'generated questions count: ' + pendingQuestions.length + '; source=generated (from /api/resume/process)');
+                if (pendingQuestions.length === 0) {
+                    console.error("[ResumeInterview] no questions after processing resume:", data);
+                    showError('processError', 'Question generation returned no questions. Please try again.');
+                    document.getElementById('uploadCard').classList.remove('hidden');
+                    return;
+                }
+                buildInterview();
+            } catch (e) {
+                hideLoading();
+                processBtn.disabled = false;
+                processBtn.textContent = originalLabel;
+                console.error("[ResumeInterview] processResume network error:", e);
+                showError('processError', 'Unable to connect to the server. Please check your connection and try again.');
+            }
+        }
+
+        function normalizeQuestions(questions) {
+            return (questions || []).filter(function (q) {
+                if (!q) return false;
+                var text = (typeof q === 'object') ? (q.question || q.text || q.content || '') : q;
+                return String(text || '').trim().length > 0;
+            }).map(function (q) {
+                if (typeof q === 'object') { return q.question || q.text || q.content || ''; }
+                return q;
+            });
+        }
+
+        function friendlyError(data) {
+            const t = data && data.error_type;
+            if (t === 'quota') return 'Gemini API rate limit reached. Please wait a moment and try again.';
+            if (t === 'auth') return 'AI API key is invalid or unavailable.';
+            if (t === 'config') return 'AI service configuration error. Please contact support.';
+            if (t === 'network') return 'Your resume was received, but the AI service connection was interrupted. Please click Process Resume again to retry — your file is still selected.';
+            return (data && data.error) || 'Server error while processing the resume.';
+        }
+
+        // ===== Interview logic =====
+        var state = null;
+        var history = [];
+        var scores = [];
+        var index = 0;
+        var totalQ = 10;
+        var currentQText = "";
+        var pendingQuestions = null;
+        var finished = false;
+        var reportSaved = false;
+
+        function escHtml(t) {
+            if (!t) return '';
+            return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        // ===== Speech controller for THIS interview page =====
+        // The shared static/script.js is also included on this page, but it is
+        // served with browser caching and its speech object uses continuous=true.
+        // To make Start/Stop reliable here we manage our OWN single
+        // SpeechRecognition instance (continuous=false -> Stop always ends, and
+        // onend NEVER auto-restarts). This controller replaces the global
+        // toggleSpeech used by the Start Speaking button and also exposes
+        // stopSpeaking() used by navigation.
+        var resumeSpeech = {
+            started: false,
+            building: false
+        };
+
+        function pageBuildRecognition() {
+            var SR = (typeof window !== 'undefined') && (window.SpeechRecognition || window.webkitSpeechRecognition);
+            if (!SR) return null;
+
+            // Abandon any prior instance cleanly so only ONE instance runs.
+            if (recognition) {
+                try {
+                    recognition.onend = null;
+                    recognition.onresult = null;
+                    recognition.stop();
+                } catch (e) {}
+            }
+
+            var r = new SR();
+            r.continuous = false;      // explicit stop always fires onend; no auto-restart
+            r.interimResults = true;
+            r.lang = 'en-US';
+
+            r.onstart = function () {
+                isListening = true;
+                resumeSpeech.started = true;
+                var b = document.getElementById('startBtn');
+                if (b) {
+                    b.innerText = 'Stop Speaking';
+                    b.classList.remove('btn-primary');
+                    b.classList.add('btn-danger');
+                }
+                var s = document.getElementById('status');
+                if (s) s.innerText = 'Listening... Speak now!';
+                console.log('[INTERVIEW] recognition started');
+            };
+
+            r.onresult = function (event) {
+                var finalPart = '';
+                var interim = '';
+                for (var i = event.resultIndex; i < event.results.length; i++) {
+                    var txt = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalPart += txt + ' ';
+                    } else {
+                        interim += txt;
+                    }
+                }
+                if (finalPart) {
+                    finalText = (finalText ? finalText + ' ' : '') + finalPart.trim();
+                }
+                var t = document.getElementById('transcript');
+                if (t) {
+                    t.innerText = (finalText ? finalText + ' ' : '') + interim;
+                    t.classList.remove('empty');
+                }
+            };
+
+            r.onerror = function (event) {
+                console.log('[INTERVIEW] recognition error:', event && event.error);
+                isListening = false;
+                resumeSpeech.started = false;
+                var b = document.getElementById('startBtn');
+                if (b) {
+                    b.innerText = 'Start Speaking';
+                    b.classList.remove('btn-danger');
+                    b.classList.add('btn-primary');
+                }
+                var s = document.getElementById('status');
+                if (s) {
+                    if (event && event.error === 'not-allowed') s.innerText = 'Microphone permission denied. Please allow microphone access.';
+                    else s.innerText = 'Speech error: ' + (event && event.error);
+                }
+            };
+
+            r.onend = function () {
+                // Never auto-restart. Just record that listening stopped.
+                isListening = false;
+                resumeSpeech.started = false;
+                var b = document.getElementById('startBtn');
+                if (b) {
+                    b.innerText = 'Start Speaking';
+                    b.classList.remove('btn-danger');
+                    b.classList.add('btn-primary');
+                }
+                var s = document.getElementById('status');
+                if (s) s.innerText = 'Recording stopped.';
+                console.log('[INTERVIEW] recognition ended (no auto-restart)');
+            };
+
+            return r;
+        }
+
+        function stopSpeaking() {
+            if (recognition) {
+                try { recognition.stop(); } catch (e) { console.log('[INTERVIEW] stopSpeaking error:', String(e)); }
+            }
+            isListening = false;
+            resumeSpeech.started = false;
+            var b = document.getElementById('startBtn');
+            if (b) {
+                b.innerText = 'Start Speaking';
+                b.classList.remove('btn-danger');
+                b.classList.add('btn-primary');
+            }
+            var s = document.getElementById('status');
+            if (s) s.innerText = 'Recording stopped.';
+            console.log('[INTERVIEW] stop speaking');
+        }
+
+        function toggleSpeech() {
+            console.log('[INTERVIEW] start speaking (toggle)');
+            if (!resumeSpeech.building) {
+                resumeSpeech.building = true;
+                try {
+                    if (recognition && typeof recognition.stop === 'function' && isListening) {
+                        stopSpeaking();
+                        resumeSpeech.building = false;
+                        return;
+                    }
+                    var r = pageBuildRecognition();
+                    if (!r) {
+                        resumeSpeech.building = false;
+                        alert('Speech recognition is not available. Please use Google Chrome.');
+                        return;
+                    }
+                    // Single instance for the whole interview.
+                    recognition = r;
+                    if (isListening) {
+                        stopSpeaking();
+                        resumeSpeech.building = false;
+                        return;
+                    }
+                    finalText = '';
+                    var t = document.getElementById('transcript');
+                    if (t) {
+                        t.innerText = 'Listening...';
+                        t.classList.remove('empty');
+                    }
+                    r.start();
+                } finally {
+                    resumeSpeech.building = false;
+                }
+                console.log('[INTERVIEW] recognition started / toggled');
+            }
+        }
+        if (typeof window !== 'undefined') { window.toggleSpeech = toggleSpeech; window.stopSpeaking = stopSpeaking; }
+
+        // ===== Session persistence =====
+        // The full interview state is kept in sessionStorage AND localStorage so
+        // that a page refresh / re-entry / new tab / new window on the same
+        // browser restores the SAME interview (no second resume upload and no
+        // second Gemini question-generation request). localStorage is shared
+        // across tabs of the same origin, so it also covers re-opening the page
+        // in a new tab. Only the explicit "Start New Interview" action clears it.
+        var STORAGE_KEY = 'resumeInterviewState';
+        var LS_KEY = 'resumeInterviewStateLocal';
+
+        function writeStorage(sk, lsk, payloadText) {
+            try { sessionStorage.setItem(sk, payloadText); } catch (e) { dbg('saveState', 'sessionStorage write failed', String(e)); }
+            try { localStorage.setItem(lsk, payloadText); } catch (e) { dbg('saveState', 'localStorage write failed', String(e)); }
+        }
+
+        function saveState() {
+            try {
+                var payload = {
+                    history: history,
+                    scores: scores,
+                    index: index,
+                    totalQ: totalQ,
+                    currentQText: currentQText,
+                    resumeData: resumeData,
+                    finished: finished
+                };
+                writeStorage(STORAGE_KEY, LS_KEY, JSON.stringify(payload));
+                dbg('saveState', 'state exists: true; index=' + index + '; questions=' + history.length);
+            } catch (e) {
+                dbg('saveState', 'FAILED to persist', String(e));
+            }
+        }
+
+        function readStorage(sk, lsk) {
+            var raw = null;
+            try { raw = sessionStorage.getItem(sk); } catch (e) {}
+            if (!raw) {
+                try { raw = localStorage.getItem(lsk); } catch (e) {}
+                // Reseed sessionStorage so the fast same-tab path works next refresh.
+                if (raw) { try { sessionStorage.setItem(sk, raw); } catch (e) {} }
+            }
+            return raw;
+        }
+
+        function clearState() {
+            try { sessionStorage.removeItem(STORAGE_KEY); } catch (e) {}
+            try { localStorage.removeItem(LS_KEY); } catch (e) {}
+        }
+
+        // A stored history only counts as "real" if it actually contains the
+        // resume-generated questions. If the saved entries are empty (no question
+        // text), treat the client state as unusable and fall through to the
+        // authoritative server state, which always has the real questions. This
+        // guarantees we NEVER show a generic default when real questions exist.
+        function hasRealQuestions(hist) {
+            if (!hist || !Array.isArray(hist) || hist.length === 0) return false;
+            var real = 0;
+            for (var i = 0; i < hist.length; i++) {
+                var h = hist[i];
+                if (h && typeof (h.question || '') === 'string' && h.question.trim().length > 0) real++;
+            }
+            // At least one real question is required; a majority is preferred.
+            return real >= 1 && real >= (hist.length / 2);
+        }
+
+        function restoreState() {
+            var raw = readStorage(STORAGE_KEY, LS_KEY);
+            if (!raw) { dbg('restoreState', 'state exists: false (no storage payload)'); return false; }
+            var p;
+            try { p = JSON.parse(raw); } catch (e) { dbg('restoreState', 'JSON.parse failed'); return false; }
+            if (!p || !Array.isArray(p.history) || p.history.length === 0) {
+                dbg('restoreState', 'state exists: false (invalid/incomplete payload)');
+                return false;
+            }
+            if (!hasRealQuestions(p.history)) {
+                // Stored history carries no real resume questions -> ignore this
+                // stale payload so the authoritative server questions are used.
+                dbg('restoreState', 'state exists: false (stored history had no real questions; using server state)');
+                return false;
+            }
+
+            history = p.history || [];
+            // Keep pendingQuestions in sync so showQuestion can recover a missing
+            // current question from the authoritative generated list.
+            pendingQuestions = history.map(function (h) { return h.question; }).filter(function (q) { return typeof q === 'string' && q.trim(); });
+            scores = p.scores || [];
+            index = (typeof p.index === 'number' && p.index >= 0) ? p.index : 0;
+            totalQ = (typeof p.totalQ === 'number' && p.totalQ > 0) ? p.totalQ : history.length;
+            currentQText = p.currentQText || "";
+            resumeData = p.resumeData || null;
+            if (index >= history.length) index = history.length - 1;
+            if (totalQ <= 0) totalQ = history.length;
+
+            if (p.finished) {
+                // STATE 4: interview was finished -> rebuild and show the result.
+                finished = true;
+                reportSaved = true; // already saved when the interview was finished
+                document.getElementById('uploadCard').classList.add('hidden');
+                document.getElementById('interviewActive').classList.add('hidden');
+                document.getElementById('interviewComplete').classList.remove('hidden');
+                try { renderReport(); } catch (e) { dbg('restoreState', 'renderReport error', String(e)); }
+                dbg('restoreState', 'restore succeeded=true; status=finished; index=' + index + '; questions=' + history.length);
+                return true;
+            }
+
+            // STATE 2/3: resume processed, interview in progress.
+            document.getElementById('uploadCard').classList.add('hidden');
+            document.getElementById('interviewActive').classList.remove('hidden');
+            document.getElementById('questionText').textContent = 'Loading...';
+            document.getElementById('qTotal').textContent = totalQ;
+            try { renderResumeContext(); } catch (e) { dbg('restoreState', 'renderResumeContext error', String(e)); }
+            showQuestion();
+            dbg('restoreState', 'restore succeeded=true; status=in-progress; index=' + index + '; questions=' + history.length);
+            return true;
+        }
+
+        // ===== Safe debug logging (no resume text, no answers, no key) =====
+        function dbg(tag, msg) {
+            try { console.log('[ResumeInterview] ' + tag + ':', msg); } catch (e) {}
+        }
+
+        function init() {
+            // 1) Try the fast client-side restore first (works for same-tab refresh).
+            if (restoreState()) { dbg('init', 'state exists: true; restored from sessionStorage'); return; }
+            // 2) The Resume-Based Interview Setup page (/resume) stores generated
+            //    questions in sessionStorage key 'resumeInterview' and redirects here.
+            //    Consume that state so the interview starts immediately.
+            if (restoreFromUploadFlow()) { dbg('init', 'state exists: true; restored from /resume upload flow'); return; }
+            dbg('init', 'state exists: false (client). Checking server session...');
+            // 3) Fall back to the server-persisted session state (works across
+            //    new tabs / windows / re-entry). NO Gemini call - reuses stored questions.
+            restoreFromServer();
+        }
+
+        function restoreFromUploadFlow() {
+            var raw = null;
+            try { raw = sessionStorage.getItem('resumeInterview'); } catch (e) {}
+            if (!raw) { try { raw = localStorage.getItem('resumeInterview'); } catch (e) {} }
+            if (!raw) return false;
+
+            var st;
+            try { st = JSON.parse(raw); } catch (e) {
+                dbg('restoreFromUploadFlow', 'resumeInterview JSON.parse failed');
+                return false;
+            }
+            if (!st || !Array.isArray(st.questions) || st.questions.length === 0) {
+                dbg('restoreFromUploadFlow', 'resumeInterview carries no questions; ignoring');
+                return false;
+            }
+
+            pendingQuestions = normalizeQuestions(st.questions);
+            console.log("Questions received:", pendingQuestions.length, pendingQuestions);
+            resumeData = st.resume_data || null;
+            console.log("Resume text length:", resumeData ? JSON.stringify(resumeData).length : 0);
+            if (!pendingQuestions || pendingQuestions.length === 0) {
+                dbg('restoreFromUploadFlow', 'normalized questions were empty; ignoring state');
+                return false;
+            }
+
+            document.getElementById('uploadCard').classList.add('hidden');
+            document.getElementById('interviewActive').classList.remove('hidden');
+            buildInterview();
+            dbg('restoreFromUploadFlow', 'interview built from /resume upload flow; questions=' + pendingQuestions.length);
+            return true;
+        }
+
+        async function restoreFromServer() {
+            var payload = null;
+            try {
+                var res = await fetch('/api/resume/interview-state', {
+                    method: 'GET',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                if (res.ok) payload = await res.json();
+            } catch (e) {
+                dbg('restoreFromServer', 'fetch error; falling back to upload');
+            }
+
+            if (!payload || !payload.has_state || !payload.questions || payload.questions.length === 0) {
+                dbg('init', 'server state exists: false; showing upload (State 1)');
+                showUpload();
+                return;
+            }
+
+            dbg('init', 'server state exists: true; questions=' + payload.questions.length);
+            pendingQuestions = normalizeQuestions(payload.questions);
+            resumeData = payload.analysis || null;
+            buildInterview();
+            dbg('restoreFromServer', 'interview restored from server; current index=0 of ' + pendingQuestions.length);
+        }
+
+        function buildInterview() {
+            var cleanQuestions = (pendingQuestions || []).slice();
+
+            if (cleanQuestions.length === 0) {
+                document.getElementById('uploadCard').classList.remove('hidden');
+                showError('processError', 'No interview questions generated. Please try again.');
+                return;
+            }
+
+            history = cleanQuestions.map(function(q) {
+                return { question: q, answer: "", score: null, category: guessCategory(q) };
+            });
+            totalQ = history.length;
+            scores = [];
+            index = 0;
+            finished = false;
+            reportSaved = false;
+
+            document.getElementById('qTotal').textContent = totalQ;
+            renderResumeContext();
+            document.getElementById('uploadCard').classList.add('hidden');
+            document.getElementById('interviewActive').classList.remove('hidden');
+            document.getElementById('questionText').textContent = 'Loading...';
+            showQuestion();
+            saveState();
+            dbg('buildInterview', 'interview built; index=0 of ' + totalQ + '; State 2 (upload hidden)');
+        }
+
+        function startInterview() {
+            if (!pendingQuestions || pendingQuestions.length === 0) {
+                document.getElementById('uploadCard').classList.remove('hidden');
+                showError('processError', 'No interview questions available. Please upload your resume again.');
+                return;
+            }
+            buildInterview();
+        }
+
+        function guessCategory(q) {
+            var l = (String(q || '')).toLowerCase();
+            if (l.includes('project') || l.includes('built') || l.includes('developed')) return 'Project';
+            if (l.includes('skill') || l.includes('technology') || l.includes('framework')) return 'Skill';
+            if (l.includes('experience') || l.includes('role') || l.includes('team')) return 'Experience';
+            if (l.includes('challenge') || l.includes('difficult') || l.includes('problem')) return 'Problem Solving';
+            if (l.includes('improve') || l.includes('better') || l.includes('scale')) return 'Critical Thinking';
+            return 'General';
+        }
+
+        function renderResumeContext() {
+            try {
+                if (!resumeData) return;
+                var tags = [];
+                var rd = resumeData;
+                if (Array.isArray(rd.skills)) tags = tags.concat(rd.skills.slice(0, 8));
+                if (Array.isArray(rd.programming_languages)) tags = tags.concat(rd.programming_languages.slice(0, 5));
+                if (Array.isArray(rd.frameworks)) tags = tags.concat(rd.frameworks.slice(0, 3));
+                var container = document.getElementById('resumeTags');
+                if (container && tags.length > 0) {
+                    container.innerHTML = tags.map(function(t) {
+                        return '<span class="tag">' + escHtml(t) + '</span>';
+                    }).join('');
+                }
+            } catch (e) {
+                dbg('renderResumeContext', 'skipped (non-fatal)', String(e));
+            }
+        }
+
+        function showQuestion() {
+            var qTextEl = document.getElementById('questionText');
+            var catEl = document.getElementById('questionCategory');
+            var qNumEl = document.getElementById('qNum');
+
+            if (!qTextEl || !catEl || !qNumEl) return;
+
+            qNumEl.textContent = index + 1;
+
+            var q = null;
+
+            if (history && index >= 0 && index < history.length && history[index]) {
+                q = history[index].question;
+                catEl.textContent = history[index].category || 'General';
+            }
+
+            // If the current history entry has no real question, recover it from
+            // the authoritative generated list (pendingQuestions). NEVER fall back
+            // to a generic default while real generated questions exist.
+            if (!q || (typeof q !== 'string') || !q.trim()) {
+                if (pendingQuestions && Array.isArray(pendingQuestions) && pendingQuestions[index] && typeof pendingQuestions[index] === 'string' && pendingQuestions[index].trim()) {
+                    q = pendingQuestions[index];
+                    if (history && history[index]) { history[index].question = q; history[index].category = guessCategory(q); }
+                    dbg('showQuestion', 'recovered missing question from generated list at index=' + index);
+                }
+            }
+
+            if (!q || (typeof q !== 'string') || !q.trim()) {
+                // No real question exists anywhere for this index. Do NOT fabricate
+                // a generic question.
+                dbg('showQuestion', 'no real question at index=' + index + ' of ' + (history ? history.length : 0) + '; revealing upload');
+                var up = document.getElementById('uploadCard');
+                if (up) up.classList.remove('hidden');
+                qTextEl.textContent = 'No interview questions available. Please upload your resume again.';
+                if (up) { showError('processError', 'No interview questions available. Please upload your resume again.'); }
+                updateNavButtons();
+                return;
+            }
+
+            currentQText = q;
+            qTextEl.textContent = currentQText;
+            qTextEl.classList.remove('loading');
+
+            console.log('[INTERVIEW] showing question index=' + index);
+            dbg('showQuestion', 'index=' + index + '; question source=generated; current question displayed');
+
+            var fbEl = document.getElementById('feedback');
+            if (fbEl) fbEl.innerHTML = '';
+
+            var t = document.getElementById('transcript');
+            if (t) {
+                var saved = (history && index >= 0 && index < history.length && history[index].answer) ? history[index].answer : "";
+                if (saved) {
+                    t.innerText = saved;
+                    t.classList.remove('empty');
+                } else {
+                    t.innerText = 'Your speech will appear here...';
+                    t.classList.add('empty');
+                }
+            }
+
+            updateNavButtons();
+        }
+
+        function updateNavButtons() {
+            var prev = document.getElementById('prevBtn');
+            var next = document.getElementById('nextBtn');
+            if (prev) prev.disabled = (index <= 0);
+            if (next) {
+                if (index >= totalQ - 1) {
+                    next.textContent = 'Finish Interview';
+                    next.onclick = function() { finishInterview(); };
+                } else {
+                    next.innerHTML = 'Next &#9654;';
+                    next.onclick = function() { nextQuestion(); };
+                }
+            }
+        }
+
+        function nextQuestion() {
+            console.log('[INTERVIEW] next clicked, index=' + index + ' (prev) / totalQ=' + totalQ + ' / history=' + history.length);
+            if (index < totalQ - 1) {
+                if (typeof stopSpeaking === 'function') stopSpeaking();
+                saveCurrentAnswerIntoHistory();
+                index++;
+                showQuestion();
+                dbg('nextQuestion', 'moved to index=' + index);
+                saveState();
+            } else {
+                console.log('[Resume Interview] Next: at last question, ignore');
+            }
+        }
+
+        function prevQuestion() {
+            console.log('[Resume Interview] Prev clicked. Before index=' + index);
+            if (index > 0) {
+                if (typeof stopSpeaking === 'function') stopSpeaking();
+                saveCurrentAnswerIntoHistory();
+                index--;
+                showQuestion();
+                dbg('prevQuestion', 'moved to index=' + index);
+                saveState();
+            } else {
+                console.log('[Resume Interview] Prev: at first question, ignore');
+            }
+        }
+
+        function saveCurrentAnswerIntoHistory() {
+            var t = document.getElementById('transcript');
+            if (!t) return;
+            var val = (t.innerText || '').trim();
+            var placeholder = 'Your speech will appear here...';
+            if (val && val !== placeholder && val !== 'Listening...' && val !== 'Recording stopped.') {
+                if (history && index >= 0 && index < history.length) {
+                    history[index].answer = val;
+                }
+            }
+        }
+
+        async function submitAnswer() {
+            console.log('[INTERVIEW] submit answer, index=' + index);
+            var t = document.getElementById('transcript');
+            var answer = (t.innerText || '').trim();
+            if (!answer || answer === 'Your speech will appear here...' || answer === 'Listening...' || answer === 'Recording stopped.') {
+                alert('Please provide an answer before submitting.');
+                return;
+            }
+
+            var btn = document.getElementById('submitBtn');
+            var loading = document.getElementById('evalLoading');
+            var fbEl = document.getElementById('feedback');
+
+            loading.classList.add('active');
+            btn.disabled = true;
+            var originalLabel = btn.textContent;
+            btn.textContent = 'Analyzing...';
+
+            var res, data;
+            try {
+                res = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        text: answer,
+                        question: currentQText,
+                        interview_type: (state && state.interview_type) ? state.interview_type : 'mixed'
+                    })
+                });
+                if (!res.ok) {
+                    var errMsg = 'Request failed (' + res.status + ').';
+                    try {
+                        var errBody = await res.json();
+                        if (errBody && errBody.error) {
+                            if (errBody.error_type === 'quota') errMsg = 'Gemini API rate limit reached. Please wait a moment and try again.';
+                            else if (errBody.error_type === 'auth') errMsg = 'AI API key is invalid or unavailable.';
+                            else if (errBody.error_type === 'config') errMsg = 'AI service configuration error.';
+                            else errMsg = errBody.error;
+                        }
+                    } catch (_) {}
+                    throw new Error(errMsg);
+                }
+                data = await res.json();
+            } catch (e) {
+                loading.classList.remove('active');
+                btn.disabled = false;
+                btn.textContent = originalLabel;
+                if (fbEl) {
+                    fbEl.innerHTML = '<div class="alert alert-error">Unable to submit your answer: ' + escHtml(e.message || 'Could not connect to server.') + '<br><button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="submitAnswer()">Retry</button></div>';
+                }
+                return;
+            }
+
+            loading.classList.remove('active');
+            btn.disabled = false;
+            btn.textContent = originalLabel;
+
+            if (fbEl) fbEl.innerHTML = '';
+
+            scores.push({
+                overall: (typeof data.overall_score === "number" ? data.overall_score : 70),
+                scores: data.scores || {},
+                question: currentQText,
+                answer: answer,
+                category: (history[index] && history[index].category) ? history[index].category : 'General',
+                feedback: data.ai_feedback || "",
+                better_answer: data.better_answer || ""
+            });
+
+            if (history && index >= 0 && index < history.length) {
+                history[index].answer = answer;
+                history[index].score = (typeof data.overall_score === "number" ? data.overall_score : 70);
+            }
+
+            var score = (typeof data.overall_score === "number" ? data.overall_score : 70);
+            var fb = '<div class="alert alert-info">';
+            fb += 'Marks: <strong>' + score + ' / 100</strong>';
+            fb += ' &mdash; Percentage: <strong>' + score + '%</strong>';
+            if (data.interview_tip) fb += ' &mdash; ' + escHtml(data.interview_tip);
+            fb += '</div>';
+            if (data.feedback_note) {
+                fb += '<div class="alert alert-warning" style="margin-top:8px;">' + escHtml(data.feedback_note) + '</div>';
+            }
+            if (fbEl) fbEl.innerHTML = fb;
+
+            // Answer is graded and saved above. Navigation is handled ONLY by the
+            // Previous / Next ("Finish Interview") buttons, so the question index
+            // is not advanced here. This prevents Next from double-advancing or
+            // skipping questions after a submission.
+            updateNavButtons();
+            saveState();
+        }
+
+        function finishInterview() {
+            finished = true;
+            document.getElementById('interviewActive').classList.add('hidden');
+            document.getElementById('interviewComplete').classList.remove('hidden');
+            renderReport();
+            saveState();
+        }
+
+        function renderReport() {
+            var total = scores.length;
+            var sum = 0;
+            var catTotals = {};
+            var catCounts = {};
+
+            scores.forEach(function(s) {
+                sum += s.overall;
+                if (s.scores) {
+                    for (var c in s.scores) {
+                        catTotals[c] = (catTotals[c] || 0) + s.scores[c];
+                        catCounts[c] = (catCounts[c] || 0) + 1;
+                    }
+                }
+            });
+
+            var avgScore = total > 0 ? Math.round(sum / total) : 0;
+
+            var catLabels = {
+                communication: "Communication",
+                confidence: "Confidence",
+                clarity: "Clarity",
+                grammar: "Grammar",
+                relevance: "Relevance",
+                structure: "Answer Structure",
+                technical_knowledge: "Technical Knowledge"
+            };
+
+            var strengths = [];
+            var improvements = [];
+            for (var c in catTotals) {
+                var avg = Math.round(catTotals[c] / catCounts[c]);
+                var label = catLabels[c] || c;
+                if (avg >= 80) strengths.push(label + ": " + avg + " / 100 (" + avg + "%)");
+                else if (avg < 70) improvements.push(label + ": " + avg + " / 100 (" + avg + "%)");
+            }
+
+            var html = '<div class="report-section">';
+            html += '<div class="report-score-display">';
+            html += '<div class="report-marks">' + avgScore + ' / 100</div>';
+            html += '<div class="report-pct">' + avgScore + '%</div>';
+            html += '<div class="text-muted">Overall Score</div>';
+            html += '<div class="text-muted" style="margin-top:0.25rem;">' + total + ' questions completed</div>';
+            html += '</div></div>';
+
+            html += '<div class="report-section">';
+            html += '<h4>Category Scores</h4>';
+            html += '<div class="score-overview">';
+            for (var c in catTotals) {
+                var avg = Math.round(catTotals[c] / catCounts[c]);
+                var label = catLabels[c] || c;
+                var cls = avg >= 80 ? 'high' : avg >= 60 ? 'medium' : 'low';
+                html += '<div class="score-item"><div class="score-label">' + label + '</div><div class="score-marks ' + cls + '">' + avg + ' / 100</div><div class="score-pct">' + avg + '%</div></div>';
+            }
+            html += '<div class="score-item" style="border:2px solid var(--primary);background:#eef2ff;"><div class="score-label" style="font-weight:700;">Total Performance</div><div class="score-marks" style="font-size:1.5rem;">' + avgScore + ' / 100</div><div class="score-pct">' + avgScore + '%</div></div>';
+            html += '</div></div>';
+
+            if (strengths.length > 0) {
+                html += '<div class="report-section"><h4>Strengths</h4><ul class="strengths-list">';
+                strengths.forEach(function(s) { html += '<li>' + s + '</li>'; });
+                html += '</ul></div>';
+            }
+            if (improvements.length > 0) {
+                html += '<div class="report-section"><h4>Areas for Improvement</h4><ul class="improvements-list">';
+                improvements.forEach(function(s) { html += '<li>' + s + '</li>'; });
+                html += '</ul></div>';
+            }
+
+            if (scores.length > 0) {
+                html += '<div class="report-section"><h4>Question Review</h4>';
+                scores.forEach(function(s, i) {
+                    var cls = s.overall >= 80 ? 'high' : s.overall >= 60 ? 'medium' : 'low';
+                    html += '<div class="review-item">';
+                    html += '<div class="review-question"><strong>Q' + (i+1) + '</strong> [' + escHtml(s.category) + ']: ' + escHtml(s.question) + '</div>';
+                    html += '<div class="review-answer">' + escHtml(s.answer) + '</div>';
+                    html += '<div class="review-score">Marks: <span class="score-badge ' + cls + '">' + s.overall + ' / 100</span> &mdash; Percentage: <span class="score-badge ' + cls + '">' + s.overall + '%</span></div>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
+            if (resumeData && resumeData.skills && resumeData.skills.length > 0) {
+                html += '<div class="report-section"><h4>Resume Areas Covered</h4><div style="display:flex;flex-wrap:wrap;gap:6px;">';
+                resumeData.skills.slice(0, 10).forEach(function(s) {
+                    html += '<span style="background:var(--primary);color:white;padding:4px 12px;border-radius:6px;font-size:0.8rem;">' + escHtml(s) + '</span>';
+                });
+                html += '</div></div>';
+            }
+
+            html += '<div class="report-section ai-recommendation">';
+            html += '<div class="rec-header">&#129302; AI Recommendation</div>';
+            html += '<div class="rec-text">';
+            if (avgScore >= 80) {
+                html += 'Strong resume-based performance! Your answers demonstrate solid knowledge of the skills listed in your resume. Focus on adding more measurable results to reach the next level.';
+            } else if (avgScore >= 60) {
+                html += 'Good foundation! Work on explaining your resume projects in more detail using the STAR method. Practice connecting your skills to real-world applications.';
+            } else {
+                html += 'Keep practicing! Review the projects and skills on your resume and practice explaining them clearly. Focus on structuring your answers with Problem, Approach, and Result.';
+            }
+            html += '</div></div>';
+
+            document.getElementById('report').innerHTML = html;
+            saveResumeInterview(avgScore);
+        }
+
+        async function saveResumeInterview(overallScore) {
+            if (reportSaved) return;
+            reportSaved = true;
+
+            // Build the persisted report payload from the REAL evaluated data
+            // (scores already produced by /analyze). No fake values, no extra
+            // Gemini call - this is sent once when the interview is finished.
+            var details = (scores || []).map(function(s) {
+                return {
+                    category: (s && s.category) || 'General',
+                    question: (s && s.question) || '',
+                    answer: (s && s.answer) || '',
+                    score: (s && typeof s.overall === 'number') ? s.overall : null,
+                    feedback: (s && s.feedback) || '',
+                    better_answer: (s && s.better_answer) || ''
+                };
+            });
+
+            var strengths = buildStrengths();
+            var improvements = buildImprovements();
+            var overallFeedback = buildOverallFeedback(overallScore, strengths, improvements);
+
+            var roleEl = document.getElementById('setupRole');
+            var expEl = document.getElementById('setupExp');
+            var role = (roleEl && roleEl.value) ? roleEl.value : '';
+            var experience = (expEl && expEl.value) ? expEl.value : '';
+
+            try {
+                await fetch('/save-interview', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        interview_type: 'resume-based',
+                        overall_score: overallScore,
+                        questions_count: scores.length,
+                        communication: getCatAvg('communication'),
+                        confidence: getCatAvg('confidence'),
+                        clarity: getCatAvg('clarity'),
+                        grammar: getCatAvg('grammar'),
+                        structure: getCatAvg('structure'),
+                        relevance: getCatAvg('relevance'),
+                        details: details,
+                        strengths: strengths,
+                        improvements: improvements,
+                        role: role,
+                        experience: experience,
+                        overall_feedback: overallFeedback
+                    })
+                });
+            } catch (e) {
+                console.error('Save failed:', e);
+            }
+        }
+
+        function getCatAvg(cat) {
+            var total = 0, count = 0;
+            scores.forEach(function(s) {
+                if (s.scores && s.scores[cat] !== undefined) {
+                    total += s.scores[cat];
+                    count++;
+                }
+            });
+            return count > 0 ? Math.round(total / count) : 70;
+            // NOTE: The 70 here is a last-resort fallback only when a category
+            // had NO scored answers at all; a legitimately-scored 0 is preserved.
+        }
+
+        function getCatAverages() {
+            var averages = {};
+            var categories = ['communication', 'confidence', 'clarity', 'grammar', 'structure', 'relevance'];
+            categories.forEach(function(c) { averages[c] = getCatAvg(c); });
+            return averages;
+        }
+
+        function catLabel(key) {
+            var labels = {
+                communication: 'Communication', confidence: 'Confidence',
+                clarity: 'Clarity', grammar: 'Grammar', relevance: 'Answer Relevance',
+                structure: 'Answer Structure'
+            };
+            return labels[key] || key;
+        }
+
+        // Strengths derived from the actual per-question category scores.
+        function buildStrengths() {
+            var avgs = getCatAverages();
+            var entries = [];
+            for (var k in avgs) {
+                if (avgs[k] >= 70) entries.push({ label: catLabel(k), score: avgs[k] });
+            }
+            entries.sort(function(a, b) { return b.score - a.score; });
+            entries = entries.slice(0, 4);
+            if (entries.length === 0 && Object.keys(avgs).length > 0) {
+                // No category reached 70 -> surface the closest (top) category.
+                var top = null;
+                for (var k2 in avgs) { if (!top || avgs[k2] > avgs[top]) top = k2; }
+                if (top) entries.push({ label: catLabel(top), score: avgs[top] });
+            }
+            return entries.map(function(e) { return 'Good ' + e.label.toLowerCase() + ' (' + e.score + '/100)'; });
+        }
+
+        // Improvement areas derived from the actual per-question category scores.
+        function buildImprovements() {
+            var avgs = getCatAverages();
+            var entries = [];
+            for (var k in avgs) {
+                if (avgs[k] < 70) entries.push({ label: catLabel(k), score: avgs[k] });
+            }
+            entries.sort(function(a, b) { return a.score - b.score; });
+            entries = entries.slice(0, 4);
+            if (entries.length === 0 && Object.keys(avgs).length > 0) {
+                // All strong -> note the lowest category as a maintenance focus.
+                var low = null;
+                for (var k2 in avgs) { if (!low || avgs[k2] < avgs[low]) low = k2; }
+                if (low) entries.push({ label: catLabel(low), score: avgs[low] });
+            }
+            return entries.map(function(e) { return 'Improve ' + e.label.toLowerCase() + ' (' + e.score + '/100)'; });
+        }
+
+        // Overall Feedback built from real evaluated data: summary + what was
+        // done well + what needs improvement. Reuses the stored scores; no AI call.
+        function buildOverallFeedback(overallScore, strengths, improvements) {
+            var parts = [];
+
+            var summary;
+            if (overallScore >= 80) summary = 'Overall performance was strong. You answered ' + scores.length + ' question(s) with a combined score of ' + overallScore + '/100, demonstrating solid command of the topics covered.';
+            else if (overallScore >= 60) summary = 'Overall performance was good. You answered ' + scores.length + ' question(s) with a combined score of ' + overallScore + '/100, showing a solid foundation with room to reach a higher level.';
+            else summary = 'Overall performance needs work. You answered ' + scores.length + ' question(s) with a combined score of ' + overallScore + '/100. With focused practice this can improve quickly.';
+            parts.push('Summary: ' + summary);
+
+            if (strengths && strengths.length > 0) {
+                parts.push('Well done: ' + strengths.join('; '));
+            }
+
+            if (improvements && improvements.length > 0) {
+                parts.push('Areas to improve: ' + improvements.join('; '));
+            } else {
+                parts.push('Areas to improve: Keep reinforcing your answers with specific, real-world examples to maintain this level.');
+            }
+
+            return parts.join('\n');
+        }
+
+        function goHome() {
+            // Also clear the server-persisted state so a fresh interview is possible.
+            try {
+                fetch('/api/resume/interview-state', { method: 'DELETE' })
+                    .catch(function () { dbg('goHome', 'server state clear failed (non-fatal)'); });
+            } catch (e) {}
+
+            clearState();
+            finished = false;
+            reportSaved = false;
+            history = [];
+            scores = [];
+            index = 0;
+            currentQText = "";
+            pendingQuestions = null;
+            resumeData = null;
+            try { sessionStorage.removeItem('resumeInterview'); } catch(e) {}
+            dbg('goHome', 'Start New Interview: cleared client+server state');
+            showUpload();
+        }
+
+        // If anything fails during load, ensure SOMETHING useful is still visible
+        // instead of leaving the page blank. If a processed interview already
+        // exists it stays visible; otherwise fall back to the upload area.
+        window.addEventListener('error', function () {
+            try {
+                var raw = readStorage(STORAGE_KEY, LS_KEY);
+                if (raw) return; // a processed interview exists -> keep current view
+                var f = document.getElementById('uploadCard');
+                if (f && f.classList.contains('hidden')) {
+                    f.classList.remove('hidden');
+                }
+            } catch (e) {}
+        });
+
+        window.onload = init;
+    </script>
+</body>
+</html>

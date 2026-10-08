@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Details - AI Voice Coach Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand"><span>&#127908;</span> AI Voice Coach</a>
+            <button class="navbar-toggle" onclick="toggleNav()">&#9776;</button>
+            <ul class="navbar-nav">
+                <li><a href="{{ url_for('admin_dashboard') }}" class="{% if active_page == 'dashboard' %}active{% endif %}">Admin Dashboard</a></li>
+                <li><a href="{{ url_for('admin_users') }}" class="{% if active_page == 'users' %}active{% endif %}">Users</a></li>
+                <li><a href="{{ url_for('admin_analytics') }}" class="{% if active_page == 'analytics' %}active{% endif %}">Analytics</a></li>
+                <li><a href="{{ url_for('admin_reports') }}" class="{% if active_page == 'reports' %}active{% endif %}">System Reports</a></li>
+                {% if user %}
+                <li class="navbar-user">
+                    <span class="user-name">&#128081; {{ user.full_name }} (Admin)</span>
+                    <a href="/logout" class="btn btn-outline btn-sm">Logout</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container page-content">
+
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        <a href="{{ url_for('admin_users') }}" class="btn btn-outline">&laquo; Back to Users</a>
+        {% else %}
+
+        <div class="section-header">
+            <h2>&#128100; {{ target_user.full_name }}</h2>
+            <p>{{ target_user.email }} &middot; Registered {{ target_user.created_at.strftime('%b %d, %Y') }}</p>
+        </div>
+
+        <!-- USER BASIC INFO + STATUS CHANGES -->
+        <div class="card mb-3">
+            <div class="card-header">User Overview</div>
+            <div style="padding:20px; display:flex; gap:16px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
+                <div style="display:grid; gap:8px; grid-template-columns:auto auto; column-gap:24px;">
+                    <span class="text-muted">Role:</span>
+                    <strong><span class="score-badge {% if target_user.role == 'admin' %}high{% else %}medium{% endif %}">{{ target_user.role }}</span></strong>
+                    <span class="text-muted">Status:</span>
+                    <strong>{% if target_user.is_active %}<span class="score-badge high">Active</span>{% else %}<span class="score-badge low">Inactive</span>{% endif %}</strong>
+                </div>
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    {% if target_user.id != user.id %}
+                    <form method="POST" action="/admin/user/{{ target_user.id }}/role" style="display:inline-flex; gap:8px; align-items:center;">
+                        <select name="role" class="form-control" style="width:auto; padding:0.4rem 1rem;">
+                            <option value="user" {% if target_user.role == 'user' %}selected{% endif %}>User</option>
+                            <option value="admin" {% if target_user.role == 'admin' %}selected{% endif %}>Admin</option>
+                        </select>
+                        <button type="submit" class="btn btn-outline btn-sm">Change Role</button>
+                    </form>
+                    <button class="btn btn-sm {% if target_user.is_active %}btn-danger{% else %}btn-success{% endif %}"
+                            onclick="toggleStatus()">
+                        {{ 'Deactivate' if target_user.is_active else 'Activate' }} Account
+                    </button>
+                    {% else %}
+                    <span class="text-muted">This is your own account; you cannot modify it here.</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- PERFORMANCE SUMMARY -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ stats.practice_count }}</div>
+                <div class="stat-label">Practice Sessions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ stats.mock_count }}</div>
+                <div class="stat-label">Mock Interviews</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{% if stats.latest_score is not none %}{{ stats.latest_score }}{% else %}--{% endif %}</div>
+                <div class="stat-label">Latest Interview Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{% if stats.avg_score is not none %}{{ stats.avg_score }}{% else %}--{% endif %}</div>
+                <div class="stat-label">Average Score</div>
+            </div>
+        </div>
+
+        <!-- STRONGEST / WEAKEST -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;">
+            <div class="card" style="border-left:4px solid #22c55e;">
+                <div class="card-header">&#127942; Strongest Category</div>
+                <div style="padding:20px; text-align:center;">
+                    {% if strongest %}
+                    <div style="font-size:1.3rem; font-weight:700; color:#22c55e;">{{ strongest[1] }} / 100</div>
+                    <div style="font-size:1rem; font-weight:600; margin-top:4px;">
+                        {% for key, label in [('communication', 'Communication'), ('confidence', 'Confidence'), ('clarity', 'Clarity'), ('grammar', 'Grammar'), ('relevance', 'Relevance'), ('structure', 'Structure')] %}
+                        {% if key == strongest[0] %}{{ label }}{% endif %}
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-muted">No scored interviews yet.</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card" style="border-left:4px solid #ef4444;">
+                <div class="card-header">&#127919; Weakest Category</div>
+                <div style="padding:20px; text-align:center;">
+                    {% if weakest %}
+                    <div style="font-size:1.3rem; font-weight:700; color:#ef4444;">{{ weakest[1] }} / 100</div>
+                    <div style="font-size:1rem; font-weight:600; margin-top:4px;">
+                        {% for key, label in [('communication', 'Communication'), ('confidence', 'Confidence'), ('clarity', 'Clarity'), ('grammar', 'Grammar'), ('relevance', 'Relevance'), ('structure', 'Structure')] %}
+                        {% if key == weakest[0] %}{{ label }}{% endif %}
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-muted">No scored interviews yet.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- RECENT INTERVIEW HISTORY -->
+        <div class="card">
+            <div class="card-header">&#128214; Interview History</div>
+            <div style="padding:0 20px 20px;">
+                {% if interviews %}
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Type</th>
+                            <th>Overall</th>
+                            <th>Comm</th>
+                            <th>Conf</th>
+                            <th>Clarity</th>
+                            <th>Grammar</th>
+                            <th>Relevance</th>
+                            <th>Structure</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for inv in interviews %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ inv.interview_type }}</td>
+                            <td><span class="score-badge {% if inv.overall_score >= 80 %}high{% elif inv.overall_score >= 60 %}medium{% else %}low{% endif %}">{{ inv.overall_score }} / 100</span></td>
+                            <td>{{ inv.communication if inv.communication is not none else '--' }}</td>
+                            <td>{{ inv.confidence if inv.confidence is not none else '--' }}</td>
+                            <td>{{ inv.clarity if inv.clarity is not none else '--' }}</td>
+                            <td>{{ inv.grammar if inv.grammar is not none else '--' }}</td>
+                            <td>{{ inv.relevance if inv.relevance is not none else '--' }}</td>
+                            <td>{{ inv.structure if inv.structure is not none else '--' }}</td>
+                            <td>{{ inv.created_at.strftime('%b %d, %Y') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted">This user has no interview history yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div style="margin-top:1.5rem;">
+<a href="{{ url_for('admin_users') }}" class="btn btn-outline">&laquo; Back to Users</a>
+        </div>
+
+        {% endif %}
+
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        function toggleStatus() {
+            var userId = {{ target_user.id }};
+            if (!confirm("Are you sure you want to change this user's account status?")) return;
+            fetch("/admin/user/" + userId + "/toggle-status", { method: "POST" })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+                    location.reload();
+                })
+                .catch(function() { alert("Unable to update user status."); });
+        }
+    </script>
+</body>
+</html>

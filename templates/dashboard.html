@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - AI Voice Coach</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand"><span>&#127908;</span> AI Voice Coach</a>
+            <button class="navbar-toggle" onclick="toggleNav()">&#9776;</button>
+            <ul class="navbar-nav">
+                <li><a href="/">Home</a></li>
+                <li><a href="/practice">Practice</a></li>
+                <li><a href="/mock-interview">Mock Interview</a></li>
+                <li><a href="/dashboard" class="active">Dashboard</a></li>
+                <li><a href="/reports">Reports</a></li>
+                <li><a href="/improvement-plan">Improvement Plan</a></li>
+                {% if session.get('role') == 'admin' %}
+                <li><a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a></li>
+                {% endif %}
+                {% if user %}
+                <li class="navbar-user">
+                    <span class="user-name">&#128100; {{ user.full_name }}</span>
+                    <a href="/logout" class="btn btn-outline btn-sm">Logout</a>
+                </li>
+                {% else %}
+                <li class="navbar-auth">
+                    <a href="/login" class="btn btn-outline btn-sm">Login</a>
+                    <a href="/signup" class="btn btn-primary btn-sm">Sign Up</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container page-content">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        {% for msg in messages %}
+        <div class="alert alert-warning" style="margin-top:16px;">{{ msg }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <div class="section-header">
+            <h2>Performance Dashboard</h2>
+            <p>Track your interview preparation progress</p>
+        </div>
+
+        <!-- STATS -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">&#128202;</div>
+                <div class="stat-value">{{ stats.total_interviews }}</div>
+                <div class="stat-label">Interview Sessions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#128221;</div>
+                <div class="stat-value">{{ stats.total_questions if stats.total_questions is not none else 0 }}</div>
+                <div class="stat-label">Questions Answered</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#127942;</div>
+                <div class="stat-marks">{{ stats.average_score if stats.average_score is not none else '--' }}{{ ' / 100' if stats.average_score is not none }}</div>
+                <div class="stat-pct">{{ stats.average_score if stats.average_score is not none else '--' }}{{ '%' if stats.average_score is not none }}</div>
+                <div class="stat-label">Average Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#127775;</div>
+                <div class="stat-marks">{{ stats.best_score if stats.best_score is not none else '--' }}{{ ' / 100' if stats.best_score is not none }}</div>
+                <div class="stat-pct">{{ stats.best_score if stats.best_score is not none else '--' }}{{ '%' if stats.best_score is not none }}</div>
+                <div class="stat-label">Best Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#128293;</div>
+                <div class="stat-value">{{ stats.current_streak }}</div>
+                <div class="stat-label">Current Streak</div>
+            </div>
+        </div>
+
+        <!-- PERFORMANCE OVERVIEW -->
+        <div class="card mb-3">
+            <div class="card-header">&#128200; Performance Overview</div>
+            <div class="score-overview" id="dashScores">
+                {% set cats = [
+                    ('Communication', stats.communication),
+                    ('Confidence', stats.confidence),
+                    ('Clarity', stats.clarity),
+                    ('Grammar', stats.grammar),
+                    ('Structure', stats.structure),
+                    ('Relevance', stats.relevance)
+                ] %}
+                {% for name, val in cats %}
+                <div class="score-item">
+                    <div class="score-label">{{ name }}</div>
+                    {% if val is not none %}
+                    <div class="score-marks">{{ val }} / 100</div>
+                    <div class="score-pct">{{ val }}%</div>
+                    {% else %}
+                    <div class="score-marks">-- / 100</div>
+                    <div class="score-pct">--</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <div class="score-item" style="border: 2px solid var(--primary); background: #eef2ff;">
+                    <div class="score-label" style="font-weight: 700;">Total Performance</div>
+                    {% if stats.average_score is not none %}
+                    <div class="score-marks" style="font-size: 1.5rem;">{{ stats.average_score }} / 100</div>
+                    <div class="score-pct">{{ stats.average_score }}%</div>
+                    {% else %}
+                    <div class="score-marks" style="font-size: 1.5rem;">-- / 100</div>
+                    <div class="score-pct">--</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- AI IMPROVEMENT PLAN CARD -->
+        {% if recent_interviews %}
+        {% set latest = recent_interviews[0] %}
+        {% set cats = {'communication': 'Communication', 'confidence': 'Confidence', 'clarity': 'Clarity', 'grammar': 'Grammar', 'structure': 'Structure', 'relevance': 'Relevance'} %}
+        {% set sorted_cats = [] %}
+        {% for k, v in cats.items() %}
+        {% if latest[k] is not none %}
+        {% set _ = sorted_cats.append((k, v, latest[k])) %}
+        {% endif %}
+        {% endfor %}
+        {% if sorted_cats %}
+        {% set weakest = sorted_cats | sort(attribute=2) | first %}
+        {% set strongest = sorted_cats | sort(attribute=2) | last %}
+        <div class="card mb-3">
+            <div class="card-header">&#129302; Your AI Improvement Plan</div>
+            <div style="padding:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                <div>
+                    <div class="text-muted" style="font-size:0.85rem;">Strongest Skill</div>
+                    <strong style="color:#22c55e;">{{ strongest[1] }} &mdash; {{ strongest[2] }} / 100</strong>
+                </div>
+                <div>
+                    <div class="text-muted" style="font-size:0.85rem;">Weakest Skill</div>
+                    <strong style="color:#ef4444;">{{ weakest[1] }} &mdash; {{ weakest[2] }} / 100</strong>
+                </div>
+                <a href="/improvement-plan" class="btn btn-primary">View Improvement Plan</a>
+            </div>
+        </div>
+        {% endif %}
+        {% endif %}
+
+        <!-- PROGRESS CHART -->
+        <div class="card mb-3">
+            <div class="card-header">&#128200; Performance Over Time</div>
+            <div class="chart-container">
+                <canvas id="progressChart"></canvas>
+            </div>
+            <p class="text-center text-muted mt-1" id="chartMsg">You haven't completed a practice session yet. Start practicing to see your progress.</p>
+        </div>
+
+        <!-- INTERVIEW HISTORY -->
+        <div class="card">
+            <div class="card-header">&#128214; Recent Interviews</div>
+            <div id="historyTable">
+                <p class="text-center text-muted">You haven't completed a practice session yet. Start practicing to see your progress.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        var serverInterviews = {{ recent_interviews | tojson }};
+
+        (function() {
+            if (!serverInterviews || serverInterviews.length === 0) return;
+
+            var scores = serverInterviews.map(function(h) { return h.overall_score; }).reverse();
+            var labels = serverInterviews.map(function(h) { return new Date(h.created_at).toLocaleDateString(); }).reverse();
+
+            var ctx = document.getElementById("progressChart").getContext("2d");
+            new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: "Score",
+                        data: scores,
+                        borderColor: "#4f46e5",
+                        backgroundColor: "rgba(79,70,229,0.1)",
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, max: 100 } }
+                }
+            });
+            document.getElementById("chartMsg").style.display = "none";
+
+            var html = '<table class="history-table"><thead><tr><th>#</th><th>Type</th><th>Marks</th><th>Percentage</th><th>Date</th></tr></thead><tbody>';
+            serverInterviews.slice(0, 10).forEach(function(h, i) {
+                var cls = h.overall_score >= 80 ? "high" : h.overall_score >= 60 ? "medium" : "low";
+                var d = new Date(h.created_at);
+                html += '<tr><td>' + (i+1) + '</td><td>' + (h.interview_type || "Practice") + '</td><td><span class="score-badge ' + cls + '">' + h.overall_score + ' / 100</span></td><td><span class="score-badge ' + cls + '">' + h.overall_score + '%</span></td><td>' + d.toLocaleDateString() + '</td></tr>';
+            });
+            html += '</tbody></table>';
+            document.getElementById("historyTable").innerHTML = html;
+        })();
+    </script>
+</body>
+</html>

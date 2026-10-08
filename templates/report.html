@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports - AI Voice Coach</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand"><span>&#127908;</span> AI Voice Coach</a>
+            <button class="navbar-toggle" onclick="toggleNav()">&#9776;</button>
+            <ul class="navbar-nav">
+                <li><a href="/">Home</a></li>
+                <li><a href="/practice">Practice</a></li>
+                <li><a href="/mock-interview">Mock Interview</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="/reports" class="active">Reports</a></li>
+                <li><a href="/improvement-plan">Improvement Plan</a></li>
+                {% if session.get('role') == 'admin' %}
+                <li><a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a></li>
+                {% endif %}
+                {% if user %}
+                <li class="navbar-user">
+                    <span class="user-name">&#128100; {{ user.full_name }}</span>
+                    <a href="/logout" class="btn btn-outline btn-sm">Logout</a>
+                </li>
+                {% else %}
+                <li class="navbar-auth">
+                    <a href="/login" class="btn btn-outline btn-sm">Login</a>
+                    <a href="/signup" class="btn btn-primary btn-sm">Sign Up</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container page-content">
+
+        <div class="section-header">
+            <h2>Interview Reports</h2>
+            <p>Review your past interview sessions and download reports</p>
+        </div>
+
+        <!-- SUMMARY STATS -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">&#128202;</div>
+                <div class="stat-value">{{ stats.total_interviews }}</div>
+                <div class="stat-label">Total Sessions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#127942;</div>
+                <div class="stat-marks">{{ stats.average_score if stats.average_score is not none else '--' }}{{ ' / 100' if stats.average_score is not none }}</div>
+                <div class="stat-pct">{{ stats.average_score if stats.average_score is not none else '--' }}{{ '%' if stats.average_score is not none }}</div>
+                <div class="stat-label">Average Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#127775;</div>
+                <div class="stat-marks">{{ stats.best_score if stats.best_score is not none else '--' }}{{ ' / 100' if stats.best_score is not none }}</div>
+                <div class="stat-pct">{{ stats.best_score if stats.best_score is not none else '--' }}{{ '%' if stats.best_score is not none }}</div>
+                <div class="stat-label">Best Score</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">&#128293;</div>
+                <div class="stat-value">{{ stats.current_streak }}</div>
+                <div class="stat-label">Current Streak</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">&#128203; Session Reports</div>
+            <div id="reportsList">
+                {% if interviews %}
+                <table class="history-table">
+                    <thead>
+                        <tr><th>Date</th><th>Role</th><th>Type</th><th>Difficulty</th><th>Marks</th><th>Report</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for h in interviews %}
+                        <tr>
+                            <td>{{ h.created_at.strftime('%d %b %Y') }}</td>
+                            <td>{{ (h.role or h.interview_type or 'Practice') | replace('_', ' ') | title }}</td>
+                            <td>{{ h.interview_type | replace('_', ' ') | title }}</td>
+                            <td>{{ (h.difficulty or 'Not specified') | replace('_', ' ') | title }}</td>
+                            <td><span class="score-badge {{ 'high' if h.overall_score >= 80 else ('medium' if h.overall_score >= 60 else 'low') }}">{{ h.overall_score }} / 100</span></td>
+                            <td><a href="/reports/{{ h.id }}" class="btn btn-outline btn-sm">View Report</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="text-center" style="padding: 30px 20px;">
+                    <p class="text-muted">No completed interviews yet.</p>
+                    <p class="text-muted" style="font-size:0.85rem;">Complete an interview to generate your first report.</p>
+                    <a href="/resume-interview" class="btn btn-primary mt-2">Start Interview</a>
+                </div>
+                {% endif %}
+            </div>
+            <div class="text-center mt-3">
+                <button onclick="downloadReport()" class="btn btn-primary" {% if not interviews %}disabled{% endif %} id="downloadBtn">Download Report Summary</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        var serverInterviews = {{ interviews | tojson }};
+
+        function downloadReport() {
+            if (!serverInterviews || serverInterviews.length === 0) return;
+
+            var scores = serverInterviews.map(function(h) { return h.overall_score; });
+            var avg = Math.round(scores.reduce(function(a,b){return a+b;},0) / scores.length);
+            var best = Math.max.apply(null, scores);
+
+            var report = "AI INTERVIEW & COMMUNICATION COACH - REPORT\n";
+            report += "============================================\n\n";
+            report += "Total Sessions: " + serverInterviews.length + "\n";
+            report += "Average Score: " + avg + "%\n";
+            report += "Best Score: " + best + "%\n\n";
+            report += "SESSION HISTORY\n";
+            report += "---------------\n";
+            serverInterviews.forEach(function(h, i) {
+                var d = new Date(h.created_at);
+                report += (i+1) + ". " + d.toLocaleDateString() + " | " + (h.interview_type || "Practice") + " | Difficulty: " + (h.difficulty || "Not specified") + " | Score: " + h.overall_score + "%\n";
+            });
+
+            report += "\nAI RECOMMENDATION\n";
+            report += "-----------------\n";
+            report += "Focus on improving answer structure and reducing filler words.\n";
+            report += "Practice STAR method for behavioral questions.\n";
+
+            var blob = new Blob([report], {type: "text/plain"});
+            var a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "AI_Coach_Report_" + new Date().toISOString().slice(0,10) + ".txt";
+            a.click();
+        }
+    </script>
+</body>
+</html>

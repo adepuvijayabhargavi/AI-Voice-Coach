@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Improvement Plan - AI Voice Coach</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand"><span>&#127908;</span> AI Voice Coach</a>
+            <button class="navbar-toggle" onclick="toggleNav()">&#9776;</button>
+            <ul class="navbar-nav">
+                <li><a href="/">Home</a></li>
+                <li><a href="/practice">Practice</a></li>
+                <li><a href="/mock-interview">Mock Interview</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="/reports">Reports</a></li>
+                <li><a href="/improvement-plan" class="active">Improvement Plan</a></li>
+                {% if session.get('role') == 'admin' %}
+                <li><a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a></li>
+                {% endif %}
+                {% if user %}
+                <li class="navbar-user">
+                    <span class="user-name">&#128100; {{ user.full_name }}</span>
+                    <a href="/logout" class="btn btn-outline btn-sm">Logout</a>
+                </li>
+                {% else %}
+                <li class="navbar-auth">
+                    <a href="/login" class="btn btn-outline btn-sm">Login</a>
+                    <a href="/signup" class="btn btn-primary btn-sm">Sign Up</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container page-content">
+
+        {% if not interviews %}
+        <!-- NO INTERVIEWS STATE -->
+        <div class="section-header">
+            <h2>AI Improvement Plan</h2>
+            <p>Complete your first interview to receive personalized recommendations.</p>
+        </div>
+        <div class="card" style="text-align:center; padding:60px 20px;">
+            <div style="font-size:3rem; margin-bottom:16px;">&#128202;</div>
+            <h3 style="margin-bottom:8px;">No Interview Data Yet</h3>
+            <p class="text-muted" style="margin-bottom:24px;">Complete an interview to receive your personalized AI improvement plan.</p>
+            <a href="/practice" class="btn btn-primary btn-lg" style="margin-right:8px;">Start Practice</a>
+            <a href="/mock-interview" class="btn btn-outline btn-lg">Start Mock Interview</a>
+        </div>
+
+        {% else %}
+        <!-- PLAN PAGE -->
+        <div class="section-header">
+            <h2>AI Improvement Plan</h2>
+            <p>Personalized recommendations based on your interview performance.</p>
+        </div>
+
+        <!-- WELCOME + PERFORMANCE SUMMARY -->
+        <div class="card mb-3">
+            <div class="card-header">&#128075; Welcome back, {{ user.full_name }}</div>
+            <div style="padding:20px;">
+                <p class="text-muted" style="margin-bottom:20px;">Here's your personalized plan to help you improve your interview performance.</p>
+
+                <h4 style="margin-bottom:12px;">Current Performance</h4>
+                <div class="score-overview">
+                    {% set latest = interviews[0] %}
+                    {% set all_cats = [('Communication', latest.communication), ('Confidence', latest.confidence),
+                        ('Clarity', latest.clarity), ('Grammar', latest.grammar),
+                        ('Structure', latest.structure), ('Relevance', latest.relevance)] %}
+                    {% for name, val in all_cats %}
+                    <div class="score-item">
+                        <div class="score-label">{{ name }}</div>
+                        {% if val is not none %}
+                        <div class="score-marks">{{ val }} / 100</div>
+                        <div class="score-pct">{{ val }}%</div>
+                        {% else %}
+                        <div class="score-marks">-- / 100</div>
+                        <div class="score-pct">--</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    <div class="score-item" style="border:2px solid var(--primary); background:#eef2ff;">
+                        <div class="score-label" style="font-weight:700;">Total Performance</div>
+                        <div class="score-marks" style="font-size:1.5rem;">{{ latest.overall_score }} / 100</div>
+                        <div class="score-pct">{{ latest.overall_score }}%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STRONGEST / WEAKEST -->
+        {% if skill_stats %}
+        {% set skill_names = {'communication': 'Communication', 'confidence': 'Confidence', 'clarity': 'Clarity', 'grammar': 'Grammar', 'structure': 'Structure', 'relevance': 'Relevance'} %}
+        {% set skill_entries = [] %}
+        {% for key, stats in skill_stats.items() %}
+        {% if stats.current is not none %}
+        {% set _ = skill_entries.append((key, stats.current)) %}
+        {% endif %}
+        {% endfor %}
+        {% if skill_entries %}
+        {% set score_values = skill_entries|map(attribute=1)|list %}
+        {% if score_values|max == score_values|min %}
+        <!-- BALANCED SCORES: every category has the same value -->
+        <div class="card mb-3" style="border-left:4px solid #4f46e5;">
+            <div class="card-header">&#11088; Balanced Performance</div>
+            <div style="padding:20px; text-align:center;">
+                <div style="font-size:1.3rem; font-weight:700; color:#4f46e5;">Balanced Performance</div>
+                <div class="score-marks" style="font-size:1.5rem; margin:4px 0;">{{ score_values[0] }} / 100</div>
+                <div class="score-pct">{{ score_values[0] }}%</div>
+                <div class="text-muted" style="margin-top:8px;">All skill areas currently have the same score. Continue practicing to improve your overall performance.</div>
+            </div>
+        </div>
+        {% else %}
+        {% set sorted_skills = skill_entries|sort(attribute=1) %}
+        {% set weakest_key = sorted_skills[0][0] %}
+        {% set weakest_val = sorted_skills[0][1] %}
+        {% set strongest_key = sorted_skills[-1][0] %}
+        {% set strongest_val = sorted_skills[-1][1] %}
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;">
+            <div class="card" style="border-left:4px solid #22c55e;">
+                <div class="card-header">&#127942; Your Strongest Skill</div>
+                <div style="padding:20px; text-align:center;">
+                    <div style="font-size:1.3rem; font-weight:700; color:#22c55e;">{{ skill_names[strongest_key] }}</div>
+                    <div class="score-marks" style="font-size:1.5rem; margin:4px 0;">{{ strongest_val }} / 100</div>
+                    <div class="score-pct">{{ strongest_val }}%</div>
+                    <div class="text-muted" style="margin-top:8px;">
+                        {% if strongest_val >= 90 %}Excellent performance
+                        {% elif strongest_val >= 80 %}Very good performance
+                        {% elif strongest_val >= 70 %}Good performance
+                        {% else %}Keep practicing{% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="card" style="border-left:4px solid #ef4444;">
+                <div class="card-header">&#127919; Priority Area</div>
+                <div style="padding:20px; text-align:center;">
+                    <div style="font-size:1.3rem; font-weight:700; color:#ef4444;">{{ skill_names[weakest_key] }}</div>
+                    <div class="score-marks" style="font-size:1.5rem; margin:4px 0;">{{ weakest_val }} / 100</div>
+                    <div class="score-pct">{{ weakest_val }}%</div>
+                    <div class="text-muted" style="margin-top:8px;">
+                        {% if weakest_val < 60 %}Needs focused practice
+                        {% elif weakest_val < 70 %}Room for improvement
+                        {% else %}Maintain this level{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endif %}
+        {% endif %}
+
+        <!-- GENERATE BUTTON -->
+        <div class="card mb-3" style="text-align:center; padding:24px;">
+            <button id="generateBtn" onclick="generatePlan()" class="btn btn-primary btn-lg">
+                &#129302; Generate AI Improvement Plan
+            </button>
+            <div id="loading" style="display:none; margin-top:16px;">
+                <div class="spinner"></div>
+                <p class="text-muted" style="margin-top:8px;">Analyzing your performance... Creating your personalized improvement plan...</p>
+            </div>
+            <div id="errorMsg" style="display:none;" class="alert alert-danger" style="margin-top:16px;"></div>
+        </div>
+
+        <!-- PLAN CONTENT (filled by JS) -->
+        <div id="planContent"></div>
+
+        <!-- PROGRESS TRACKING -->
+        {% if interviews|length > 1 %}
+        <div class="card mb-3">
+            <div class="card-header">&#128200; Skill Progress</div>
+            <div style="padding:20px;">
+                {% for key, stats in skill_stats.items() %}
+                {% if stats.history|length > 1 %}
+                <div style="margin-bottom:12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <strong>{{ skill_names[key] }}</strong>
+                        <span style="color:{% if stats.trend > 0 %}#22c55e{% elif stats.trend < 0 %}#ef4444{% else %}#666{% endif %}; font-weight:600;">
+                            {% if stats.trend > 0 %}+{{ stats.trend }} &#8593;
+                            {% elif stats.trend < 0 %}{{ stats.trend }} &#8595;
+                            {% else %}&#8596; 0{% endif %}
+                        </span>
+                    </div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        {% for h in stats.history|reverse %}
+                        <span class="score-badge {% if h >= 80 %}high{% elif h >= 60 %}medium{% else %}low{% endif %}">{{ h }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+                <p class="text-muted" style="margin-top:12px; font-size:0.85rem;">Latest interview is on the right. Arrow shows direction of change.</p>
+            </div>
+        </div>
+
+        <!-- BEFORE vs TARGET -->
+        <div class="card mb-3">
+            <div class="card-header">&#127919; Before vs Target</div>
+            <div style="padding:20px;">
+                {% for key, stats in skill_stats.items() %}
+                {% set target = [stats.average + 15, 95]|min %}
+                <div style="display:grid; grid-template-columns:120px 1fr 100px 100px; gap:8px; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9;">
+                    <strong>{{ skill_names[key] }}</strong>
+                    <div style="background:#e2e8f0; border-radius:4px; height:8px;">
+                        <div style="background:{% if stats.current >= 70 %}#22c55e{% elif stats.current >= 50 %}#f59e0b{% else %}#ef4444{% endif %}; height:8px; border-radius:4px; width:{{ stats.current }}%;"></div>
+                    </div>
+                    <div style="text-align:right; font-size:0.85rem; color:#666;">{{ stats.current }}/100</div>
+                    <div style="text-align:right; font-size:0.85rem; color:#4f46e5; font-weight:600;">Target: {{ target }}/100</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% else %}
+        <div class="card mb-3" style="padding:20px;">
+            <p class="text-muted">Complete more interviews to track your improvement over time.</p>
+        </div>
+        {% endif %}
+
+        <!-- RECOMMENDED PRACTICE -->
+        <div class="card mb-3">
+            <div class="card-header">&#127891; Recommended Practice</div>
+            <div style="padding:20px; display:flex; gap:12px; flex-wrap:wrap;">
+                <a href="/practice?type=communication" class="btn btn-outline">Practice Communication</a>
+                <a href="/practice?type=behavioral" class="btn btn-outline">Practice Behavioral</a>
+                <a href="/practice?type=technical" class="btn btn-outline">Practice Technical</a>
+                <a href="/mock-interview" class="btn btn-primary">Start Mock Interview</a>
+            </div>
+        </div>
+
+        {% endif %}
+
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        function generatePlan() {
+            var btn = document.getElementById("generateBtn");
+            var loading = document.getElementById("loading");
+            var errorDiv = document.getElementById("errorMsg");
+            var content = document.getElementById("planContent");
+
+            btn.style.display = "none";
+            errorDiv.style.display = "none";
+            content.innerHTML = "";
+            loading.style.display = "block";
+
+            fetch("/improvement-plan/generate", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"}
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                loading.style.display = "none";
+                if (data.error) {
+                    errorDiv.textContent = data.error;
+                    errorDiv.style.display = "block";
+                    btn.style.display = "inline-block";
+                    return;
+                }
+                renderPlan(data);
+            })
+            .catch(function() {
+                loading.style.display = "none";
+                errorDiv.textContent = "Unable to generate your improvement plan. Please try again.";
+                errorDiv.style.display = "block";
+                btn.style.display = "inline-block";
+            });
+        }
+
+        function renderPlan(data) {
+            var p = data.plan || {};
+            var html = "";
+
+            // Category labels for dynamic strongest/weakest computation
+            var catLabels = {
+                'communication': 'Communication',
+                'confidence': 'Confidence',
+                'clarity': 'Clarity',
+                'grammar': 'Grammar',
+                'structure': 'Structure',
+                'relevance': 'Relevance'
+            };
+
+            // Compute strongest / weakest dynamically from skill_stats (local,
+            // always available) falling back to AI plan values when needed.
+            // When every scored category has the same value there is no meaningful
+            // strongest/weakest pair, so `balanced` is set and the UI shows a
+            // single Balanced Performance card instead.
+            var skillStats = data.skill_stats || {};
+            var entries = [];
+            for (var key in skillStats) {
+                if (skillStats.hasOwnProperty(key) && catLabels[key]) {
+                    var cur = skillStats[key].current;
+                    if (cur !== null && cur !== undefined) {
+                        entries.push({ key: key, score: cur });
+                    }
+                }
+            }
+
+            var balanced = false;
+            var strongest = null;
+            var weakest = null;
+            if (entries.length > 0) {
+                var maxScore = entries[0].score;
+                var minScore = entries[0].score;
+                for (var i = 0; i < entries.length; i++) {
+                    if (entries[i].score > maxScore) maxScore = entries[i].score;
+                    if (entries[i].score < minScore) minScore = entries[i].score;
+                }
+                if (maxScore === minScore) {
+                    balanced = true;
+                } else {
+                    // maxScore !== minScore guarantees the highest- and lowest-
+                    // scoring sets are disjoint, so a category can never be both
+                    // strongest and weakest. With ties, the first category of
+                    // each set is chosen deterministically.
+                    for (var j = 0; j < entries.length && (!strongest || !weakest); j++) {
+                        if (!strongest && entries[j].score === maxScore) strongest = entries[j];
+                        if (!weakest && entries[j].score === minScore) weakest = entries[j];
+                    }
+                }
+            }
+
+            // Fall back to the AI plan's values only when no local scores exist.
+            if (!balanced && entries.length === 0) {
+                if (p.strongest_skill) {
+                    strongest = { key: null, name: p.strongest_skill, score: p.strongest_score };
+                }
+                if (p.weakest_skill) {
+                    weakest = { key: null, name: p.weakest_skill, score: p.weakest_score };
+                }
+            }
+
+            var strongestName = strongest && strongest.name ? strongest.name
+                : (strongest && strongest.key ? (catLabels[strongest.key] || strongest.key) : '');
+            var weakestName = weakest && weakest.name ? weakest.name
+                : (weakest && weakest.key ? (catLabels[weakest.key] || weakest.key) : '');
+            var strongestScore = strongest ? Math.round(strongest.score) : null;
+            var weakestScore = weakest ? Math.round(weakest.score) : null;
+
+            // Build personalized messages, never identical between the two cards
+            var strongMessage = '';
+            if (strongestName) {
+                strongMessage = 'Your strongest area is ' + strongestName + ' (' + strongestScore + '/100). '
+                    + (function() {
+                        switch (strongest.key) {
+                            case 'communication': return 'You express your ideas clearly and effectively, which helps convey your thoughts confidently.';
+                            case 'confidence': return 'You answered with assurance and poise, which makes your responses persuasive and compelling.';
+                            case 'clarity': return 'You articulate your thoughts in a clear, organized manner that is easy for an interviewer to follow.';
+                            case 'grammar': return 'You use correct grammar and sentence structure, giving your answers a polished, professional feel.';
+                            case 'structure': return 'You organize your answers logically, making your reasoning easy to follow from start to finish.';
+                            case 'relevance': return 'You stay on topic and directly address what is being asked, keeping your responses focused and valuable.';
+                            default: return 'You consistently perform well in this area, which gives you a solid edge in interviews.';
+                        }
+                    })()
+                    + ' Keep maintaining this strength!';
+            }
+
+            var weakMessage = '';
+            if (weakestName) {
+                weakMessage = 'Your weakest area is ' + weakestName + ' (' + weakestScore + '/100). '
+                    + (function() {
+                        switch (weakest.key) {
+                            case 'communication': return 'Focus on expressing your ideas more clearly, expanding your answers, and connecting your points smoothly.';
+                            case 'confidence': return 'Practice speaking with more assurance, maintaining steady eye contact, and reducing hesitation or filler words.';
+                            case 'clarity': return 'Work on organizing your thoughts before speaking and simplifying complex ideas into clear, concise points.';
+                            case 'grammar': return 'Focus on improving sentence structure and grammar accuracy, and try speaking more slowly to reduce errors.';
+                            case 'structure': return 'Practice using a clear beginning, middle, and end, and structure your answers with a logical flow.';
+                            case 'relevance': return 'Work on staying on topic and making sure every part of your answer directly addresses the question asked.';
+                            default: return 'Prioritizing practice in this area will give you the biggest boost to your overall performance.';
+                        }
+                    })();
+            }
+
+            // AI Insight - Balanced Performance card, or two cards showing
+            // strongest & weakest side by side
+            if (balanced || strongestName || weakestName) {
+                html += '<div class="card mb-3"><div class="card-header">&#128161; AI Insight</div>';
+                html += '<div class="ai-insight-grid" style="padding:16px;">';
+                if (balanced) {
+                    html += '<div class="insight-card balanced">';
+                    html += '<div class="insight-card-title">&#11088; Balanced Performance</div>';
+                    html += '<p class="insight-card-text">All skill areas currently have the same score. Continue practicing to improve your overall performance.</p>';
+                    html += '</div>';
+                } else {
+                    if (strongestName) {
+                        html += '<div class="insight-card strongest">';
+                        html += '<div class="insight-card-title">&#9989; Strongest Area: ' + escapeHtml(strongestName) + '</div>';
+                        html += '<div class="insight-card-score">' + strongestScore + ' / 100</div>';
+                        html += '<p class="insight-card-text">' + escapeHtml(strongMessage) + '</p>';
+                        html += '</div>';
+                    }
+                    if (weakestName) {
+                        html += '<div class="insight-card weakest">';
+                        html += '<div class="insight-card-title">&#9888;&#65039; Weakest Area: ' + escapeHtml(weakestName) + '</div>';
+                        html += '<div class="insight-card-score">' + weakestScore + ' / 100</div>';
+                        html += '<p class="insight-card-text">' + escapeHtml(weakMessage) + '</p>';
+                        html += '</div>';
+                    }
+                }
+                html += '</div></div>';
+            }
+
+            // Recommendations
+            if (p.recommendations && p.recommendations.length > 0) {
+                html += '<div class="card mb-3"><div class="card-header">&#10003; Personalized Recommendations</div>';
+                html += '<div style="padding:20px;">';
+                p.recommendations.forEach(function(r) {
+                    html += '<div style="padding:12px 0; border-bottom:1px solid #f1f5f9;">';
+                    html += '<strong style="color:#4f46e5;">' + escapeHtml(r.title) + '</strong>';
+                    html += '<p class="text-muted" style="margin:4px 0 0 0;">' + escapeHtml(r.description) + '</p>';
+                    html += '</div>';
+                });
+                html += '</div></div>';
+            }
+
+            // 7-Day Plan
+            if (p.seven_day_plan && p.seven_day_plan.length > 0) {
+                html += '<div class="card mb-3"><div class="card-header">&#128197; 7-Day Improvement Plan</div>';
+                html += '<div style="padding:20px;">';
+                p.seven_day_plan.forEach(function(d) {
+                    html += '<div style="padding:16px 0; border-bottom:1px solid #f1f5f9;">';
+                    html += '<div style="display:flex; align-items:center; gap:12px; margin-bottom:6px;">';
+                    html += '<span class="score-badge high" style="min-width:60px; text-align:center;">Day ' + d.day + '</span>';
+                    html += '<strong>Focus: ' + escapeHtml(d.focus) + '</strong>';
+                    html += '</div>';
+                    html += '<div style="margin-left:72px;">';
+                    html += '<p style="margin:2px 0;"><strong>Activity:</strong> ' + escapeHtml(d.activity) + '</p>';
+                    html += '<p style="margin:2px 0; color:#4f46e5;"><strong>Goal:</strong> ' + escapeHtml(d.goal) + '</p>';
+                    html += '</div></div>';
+                });
+                html += '</div></div>';
+            }
+
+            // Summary
+            if (p.summary) {
+                html += '<div class="card mb-3"><div class="card-header">&#129302; AI Coach Summary</div>';
+                html += '<div style="padding:20px;"><p style="line-height:1.7; font-style:italic;">"' + escapeHtml(p.summary) + '"</p></div></div>';
+            }
+
+            // Practice links
+            html += '<div class="card mb-3"><div class="card-header">&#127891; Start Practicing</div>';
+            html += '<div style="padding:20px; display:flex; gap:12px; flex-wrap:wrap;">';
+            html += '<a href="/practice?type=communication" class="btn btn-outline">Practice Communication</a>';
+            html += '<a href="/practice?type=behavioral" class="btn btn-outline">Practice Behavioral</a>';
+            html += '<a href="/practice?type=technical" class="btn btn-outline">Practice Technical</a>';
+            html += '<a href="/mock-interview" class="btn btn-primary">Start Mock Interview</a>';
+            html += '</div></div>';
+
+            document.getElementById("planContent").innerHTML = html;
+            document.getElementById("generateBtn").style.display = "inline-block";
+        }
+    </script>
+</body>
+</html>

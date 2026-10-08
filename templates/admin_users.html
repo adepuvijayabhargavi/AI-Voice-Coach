@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management - AI Voice Coach Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand"><span>&#127908;</span> AI Voice Coach</a>
+            <button class="navbar-toggle" onclick="toggleNav()">&#9776;</button>
+            <ul class="navbar-nav">
+                <li><a href="{{ url_for('admin_dashboard') }}" class="{% if active_page == 'dashboard' %}active{% endif %}">Admin Dashboard</a></li>
+                <li><a href="{{ url_for('admin_users') }}" class="{% if active_page == 'users' %}active{% endif %}">Users</a></li>
+                <li><a href="{{ url_for('admin_analytics') }}" class="{% if active_page == 'analytics' %}active{% endif %}">Analytics</a></li>
+                <li><a href="{{ url_for('admin_reports') }}" class="{% if active_page == 'reports' %}active{% endif %}">System Reports</a></li>
+                {% if user %}
+                <li class="navbar-user">
+                    <span class="user-name">&#128081; {{ user.full_name }} (Admin)</span>
+                    <a href="/logout" class="btn btn-outline btn-sm">Logout</a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container page-content">
+
+        <div class="section-header">
+            <h2>&#128101; User Management</h2>
+            <p>{{ total }} registered user{{ 's' if total != 1 else '' }}.</p>
+        </div>
+
+        <div class="card">
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Registered</th>
+                        <th>Practice</th>
+                        <th>Mock</th>
+                        <th>Avg Score</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr>
+                        <td>{{ u.id }}</td>
+                        <td>{{ u.full_name }}</td>
+                        <td>{{ u.email }}</td>
+                        <td>
+                            <span class="score-badge {% if u.role == 'admin' %}high{% else %}medium{% endif %}">{{ u.role }}</span>
+                        </td>
+                        <td>{{ u.created_at.strftime('%b %d, %Y') }}</td>
+                        <td>{{ u.practice_count or 0 }}</td>
+                        <td>{{ u.mock_count or 0 }}</td>
+                        <td>
+                            {% if u.avg_score is not none %}{{ u.avg_score }}{% else %}--{% endif %}
+                        </td>
+                        <td>
+                            {% if u.is_active %}
+                            <span class="score-badge high">Active</span>
+                            {% else %}
+                            <span class="score-badge low">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td style="white-space:nowrap;">
+                            <a href="/admin/user/{{ u.id }}" class="btn btn-outline btn-sm">View</a>
+                            {% if u.id != user.id %}
+                            <button class="btn btn-sm {% if u.is_active %}btn-warning btn-toggle-status{% else %}btn-success btn-toggle-status{% endif %}"
+                                    data-user-id="{{ u.id }}"
+                                    onclick="toggleStatus(this)">
+                                {{ 'Deactivate' if u.is_active else 'Activate' }}
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="text-center text-muted">No users found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- PAGINATION -->
+        {% if total_pages > 1 %}
+        <div style="display:flex; justify-content:center; gap:8px; margin-top:1.5rem; flex-wrap:wrap;">
+            {% if page > 1 %}
+            <a href="/admin/users?page={{ page - 1 }}" class="btn btn-outline btn-sm">&laquo; Prev</a>
+            {% endif %}
+            <span class="text-muted" style="align-self:center;">Page {{ page }} of {{ total_pages }}</span>
+            {% if page < total_pages %}
+            <a href="/admin/users?page={{ page + 1 }}" class="btn btn-outline btn-sm">Next &raquo;</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        function toggleStatus(btn) {
+            var userId = btn.getAttribute("data-user-id");
+            if (!confirm("Are you sure you want to change this user's account status?")) return;
+            fetch("/admin/user/" + userId + "/toggle-status", { method: "POST" })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+                    location.reload();
+                })
+                .catch(function() { alert("Unable to update user status."); });
+        }
+    </script>
+</body>
+</html>

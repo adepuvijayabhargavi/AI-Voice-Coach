@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume-Based Interview - AI Voice Coach</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .upload-card {
+            background: var(--card-bg);
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            transition: border-color 0.3s;
+        }
+        .upload-card:hover { border-color: var(--primary); }
+        .upload-area { cursor: pointer; }
+        .upload-area .icon { font-size: 3rem; margin-bottom: 16px; }
+        .upload-area h3 { font-size: 1.1rem; color: var(--text); margin-bottom: 8px; }
+        .upload-area p { color: var(--text-muted); font-size: 0.9rem; }
+        .formats { display: flex; gap: 12px; justify-content: center; margin-top: 16px; }
+        .format-badge {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+        .analysis-result { display: none; }
+        .analysis-section {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .analysis-section h4 {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .skill-tag {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            margin: 3px;
+            font-weight: 500;
+        }
+        .project-item {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .project-item:last-child { border-bottom: none; }
+        .project-name { font-weight: 600; color: var(--text); font-size: 0.95rem; }
+        .project-tech { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+        .project-desc { font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; }
+        .exp-item { padding: 8px 0; }
+        .exp-title { font-weight: 600; font-size: 0.95rem; }
+        .exp-company { font-size: 0.85rem; color: var(--primary); }
+        .exp-duration { font-size: 0.8rem; color: var(--text-muted); }
+        .edu-item { padding: 6px 0; }
+        .edu-degree { font-weight: 600; font-size: 0.95rem; }
+        .edu-inst { font-size: 0.85rem; color: var(--text-muted); }
+        .setup-form { display: none; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+        }
+        .form-group select, .form-group input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.95rem;
+            outline: none;
+        }
+        .form-group select:focus, .form-group input:focus { border-color: var(--primary); }
+        .inline-group { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .question-count-group { display: flex; gap: 8px; margin-top: 6px; }
+        .question-count-group input[type="radio"] { display: none; }
+        .question-count-group label.count-label {
+            padding: 8px 18px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .question-count-group input[type="radio"]:checked + label.count-label {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+        .loading-box {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error-box {
+            background: #FEE2E2;
+            border: 1px solid #F87171;
+            color: #991B1B;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin: 12px 0;
+            display: none;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container" style="max-width: 700px; padding-top: 2rem;">
+
+        <!-- STEP 1: Upload -->
+        <div id="step1">
+            <div class="page-header">
+                <h1 class="page-title">Resume-Based Interview</h1>
+                <p class="page-subtitle">Upload your resume and get personalized interview questions based on your actual skills, projects, education and experience.</p>
+            </div>
+
+            <div class="upload-card">
+                <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                    <div class="icon">&#128196;</div>
+                    <h3>Choose Resume</h3>
+                    <p>Drag and drop or click to browse</p>
+                    <div class="formats">
+                        <span class="format-badge">PDF</span>
+                        <span class="format-badge">DOCX</span>
+                        <span class="format-badge">TXT</span>
+                    </div>
+                    <p style="margin-top:12px; font-size:0.8rem; color:var(--text-muted);">Maximum file size: 5 MB</p>
+                </div>
+                <input type="file" id="fileInput" accept=".pdf,.docx,.txt" style="display:none" onchange="handleFileSelect(this)">
+            </div>
+
+            <div id="fileInfo" style="display:none; margin-top:12px; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:12px 16px; display:flex; align-items:center; gap:12px;">
+                <span id="fileIcon" style="font-size:1.5rem;"></span>
+                <div style="flex:1;">
+                    <div id="fileName" style="font-weight:600; font-size:0.9rem;"></div>
+                    <div id="fileSize" style="font-size:0.8rem; color:var(--text-muted);"></div>
+                </div>
+                <button onclick="clearFile()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.2rem;">&#10005;</button>
+            </div>
+
+            <button id="analyzeBtn" class="btn btn-primary" style="width:100%; margin-top:16px; display:none;" onclick="analyzeResume()">
+                Analyze Resume
+            </button>
+
+            <div id="analyzeError" class="error-box"></div>
+        </div>
+
+        <!-- STEP 2: Analysis Result -->
+        <div id="step2" class="analysis-result">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+                <span style="font-size:2rem;">&#9989;</span>
+                <div>
+                    <h2 style="font-size:1.3rem; color:var(--text); margin:0;">Resume Analyzed</h2>
+                    <p style="color:var(--text-muted); font-size:0.85rem; margin:0;">Extracted skills, projects and experience from your resume</p>
+                </div>
+            </div>
+
+            <div id="skillsSection" class="analysis-section" style="display:none;">
+                <h4>Skills</h4>
+                <div id="skillsTags"></div>
+            </div>
+
+            <div id="langsSection" class="analysis-section" style="display:none;">
+                <h4>Programming Languages</h4>
+                <div id="langsTags"></div>
+            </div>
+
+            <div id="frameworksSection" class="analysis-section" style="display:none;">
+                <h4>Frameworks</h4>
+                <div id="frameworksTags"></div>
+            </div>
+
+            <div id="projectsSection" class="analysis-section" style="display:none;">
+                <h4>Projects</h4>
+                <div id="projectsList"></div>
+            </div>
+
+            <div id="experienceSection" class="analysis-section" style="display:none;">
+                <h4>Experience</h4>
+                <div id="experienceList"></div>
+            </div>
+
+            <div id="educationSection" class="analysis-section" style="display:none;">
+                <h4>Education</h4>
+                <div id="educationList"></div>
+            </div>
+
+            <div id="certsSection" class="analysis-section" style="display:none;">
+                <h4>Certifications</h4>
+                <div id="certsTags"></div>
+            </div>
+
+            <button class="btn btn-primary" style="width:100%; margin-top:16px;" onclick="showSetup()">
+                Continue to Interview Setup
+            </button>
+        </div>
+
+        <!-- STEP 3: Setup -->
+        <div id="step3" class="setup-form">
+            <div class="page-header">
+                <h1 class="page-title">Resume-Based Interview Setup</h1>
+            </div>
+
+            <div class="card" style="padding:24px;">
+                <div class="form-group">
+                    <label>Target Role</label>
+                    <select id="setupRole">
+                        {% for key, name in roles.items() %}
+                        <option value="{{ key }}">{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="inline-group">
+                    <div class="form-group">
+                        <label>Experience Level</label>
+                        <select id="setupExp">
+                            <option value="fresher">Fresher</option>
+                            <option value="junior">Junior (1-3 yrs)</option>
+                            <option value="mid">Mid (3-6 yrs)</option>
+                            <option value="senior">Senior (6+ yrs)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Difficulty</label>
+                        <select id="setupDiff">
+                            <option value="easy">Easy</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Interview Type</label>
+                    <select id="setupType">
+                        <option value="mixed">Mixed</option>
+                        <option value="technical">Technical Only</option>
+                        <option value="behavioral">Behavioral Only</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Number of Questions</label>
+                    <div class="question-count-group">
+                        <input type="radio" name="qcount" id="qc5" value="5">
+                        <label for="qc5" class="count-label">5</label>
+                        <input type="radio" name="qcount" id="qc10" value="10" checked>
+                        <label for="qc10" class="count-label">10</label>
+                        <input type="radio" name="qcount" id="qc15" value="15">
+                        <label for="qc15" class="count-label">15</label>
+                        <input type="radio" name="qcount" id="qc20" value="20">
+                        <label for="qc20" class="count-label">20</label>
+                    </div>
+                </div>
+            </div>
+
+            <button id="startBtn" class="btn btn-primary" style="width:100%; margin-top:16px;" onclick="generateAndStart()">
+                Generate Personalized Questions
+            </button>
+            <div id="generateError" class="error-box"></div>
+        </div>
+
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-box">
+            <div class="spinner"></div>
+            <p id="loadingText" style="font-weight:600; margin:0;">Analyzing...</p>
+            <p id="loadingSub" style="color:var(--text-muted); font-size:0.85rem; margin:8px 0 0;"></p>
+        </div>
+    </div>
+
+    <script>
+        let resumeData = null;
+        let resumeText = "";
+
+        function showLoading(text, sub) {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingSub').textContent = sub || '';
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+        function showError(id, msg) {
+            const el = document.getElementById(id);
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+        function hideError(id) { document.getElementById(id).style.display = 'none'; }
+
+        function handleFileSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (!['pdf', 'docx', 'txt'].includes(ext)) {
+                alert('Please upload a valid PDF, DOCX or TXT file.');
+                input.value = '';
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File too large. Maximum size is 5 MB.');
+                input.value = '';
+                return;
+            }
+
+            const icons = { pdf: '&#128196;', docx: '&#128209;', txt: '&#128196;' };
+            document.getElementById('fileIcon').innerHTML = icons[ext] || '&#128196;';
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = (file.size / 1024).toFixed(1) + ' KB';
+            document.getElementById('fileInfo').style.display = 'flex';
+            document.getElementById('analyzeBtn').style.display = 'block';
+            hideError('analyzeError');
+        }
+
+        function clearFile() {
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('analyzeBtn').style.display = 'none';
+        }
+
+        async function analyzeResume() {
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files[0]) return;
+
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const originalLabel = 'Analyze Resume';
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = 'Analyzing Resume...';
+
+            hideError('analyzeError');
+            showLoading('Analyzing your resume...', 'Extracting skills, projects and experience...');
+
+            const formData = new FormData();
+            formData.append('resume_file', fileInput.files[0]);
+
+            try {
+                const res = await fetch('/api/resume/analyze', { method: 'POST', body: formData });
+                let data;
+                try {
+                    data = await res.json();
+                } catch (parseErr) {
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.textContent = originalLabel;
+                    hideLoading();
+                    showError('analyzeError', 'Server error while analyzing the resume.');
+                    return;
+                }
+                hideLoading();
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = originalLabel;
+
+                if (!res.ok || data.error) {
+                    showError('analyzeError', friendlyError(data));
+                    return;
+                }
+
+                resumeData = data.analysis;
+                resumeText = data.resume_text || '';
+                console.log("Resume analysis stored. data keys:", Object.keys(resumeData || {}), "| resume text length:", resumeText ? resumeText.length : 0);
+                renderAnalysis(resumeData);
+                document.getElementById('step1').style.display = 'none';
+                document.getElementById('step2').style.display = 'block';
+            } catch (e) {
+                hideLoading();
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = originalLabel;
+                showError('analyzeError', 'Unable to connect to the server.');
+            }
+        }
+
+        function friendlyError(data) {
+            const t = data && data.error_type;
+            if (t === 'quota') return 'Gemini API rate limit reached. Please wait a moment and try again.';
+            if (t === 'auth') return 'AI API key is invalid or unavailable.';
+            if (t === 'config') return 'AI service configuration error. ' + ((data && data.error) || 'Please contact support.');
+            if (t === 'network') return 'Your resume was received, but the AI service connection was interrupted. Please try again — your file is still selected.';
+            return (data && data.error) || 'Server error while analyzing the resume.';
+        }
+
+        function renderSection(id, tagId, items) {
+            if (!items || (Array.isArray(items) && items.length === 0)) return;
+            document.getElementById(id).style.display = 'block';
+            const container = document.getElementById(tagId);
+            if (Array.isArray(items)) {
+                container.innerHTML = items.map(i => `<span class="skill-tag">${i}</span>`).join('');
+            }
+        }
+
+        function renderProjects(projects) {
+            if (!projects || projects.length === 0) return;
+            document.getElementById('projectsSection').style.display = 'block';
+            document.getElementById('projectsList').innerHTML = projects.map(p => `
+                <div class="project-item">
+                    <div class="project-name">${p.name || 'Project'}</div>
+                    ${p.description ? `<div class="project-desc">${p.description}</div>` : ''}
+                    ${p.technologies && p.technologies.length ? `<div class="project-tech">Technologies: ${p.technologies.join(', ')}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function renderExperience(exp) {
+            if (!exp || exp.length === 0) return;
+            document.getElementById('experienceSection').style.display = 'block';
+            document.getElementById('experienceList').innerHTML = exp.map(e => `
+                <div class="exp-item">
+                    <div class="exp-title">${e.title || ''}</div>
+                    <div class="exp-company">${e.company || ''}</div>
+                    <div class="exp-duration">${e.duration || ''}</div>
+                    ${e.description ? `<div class="project-desc">${e.description}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function renderEducation(edu) {
+            if (!edu || edu.length === 0) return;
+            document.getElementById('educationSection').style.display = 'block';
+            document.getElementById('educationList').innerHTML = edu.map(e => `
+                <div class="edu-item">
+                    <div class="edu-degree">${e.degree || ''}</div>
+                    <div class="edu-inst">${e.institution || ''} ${e.year ? ' - ' + e.year : ''}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderAnalysis(data) {
+            renderSection('skillsSection', 'skillsTags', data.skills);
+            renderSection('langsSection', 'langsTags', data.programming_languages);
+            renderSection('frameworksSection', 'frameworksTags', data.frameworks);
+            renderProjects(data.projects);
+            renderExperience(data.experience);
+            renderEducation(data.education);
+            renderSection('certsSection', 'certsTags', data.certifications);
+        }
+
+        function showSetup() {
+            document.getElementById('step2').style.display = 'none';
+            document.getElementById('step3').style.display = 'block';
+        }
+
+        async function generateAndStart() {
+            console.log("Generate Questions button clicked");
+            const role = document.getElementById('setupRole').value;
+            const exp = document.getElementById('setupExp').value;
+            const type = document.getElementById('setupType').value;
+            const diff = document.getElementById('setupDiff').value;
+            const count = document.querySelector('input[name="qcount"]:checked').value;
+
+            hideError('generateError');
+
+            // Validate resume data BEFORE calling the API. Never send an empty
+            // resume to the AI provider.
+            if (!resumeData || typeof resumeData !== 'object' || Object.keys(resumeData).length === 0) {
+                showError('generateError', 'No resume information found. Please upload or complete your resume first.');
+                console.error("generateAndStart: resume data is EMPTY; aborting before calling the API. resumeData =", resumeData);
+                return;
+            }
+
+            const genBtn = document.getElementById('startBtn');
+            genBtn.disabled = true;
+
+            showLoading('Creating your personalized interview...', 'Generating questions based on your resume...');
+
+            const requestData = {
+                resume_data: resumeData,
+                resume_text: resumeText,
+                role: role,
+                experience: exp,
+                interview_type: type,
+                difficulty: diff,
+                count: parseInt(count)
+            };
+            console.log("Resume text length:", resumeText ? resumeText.length : 0);
+            console.log("Generation request:", requestData);
+
+            try {
+                const res = await fetch('/api/resume/generate-questions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestData)
+                });
+                let data;
+                try {
+                    data = await res.json();
+                } catch (parseErr) {
+                    hideLoading();
+                    genBtn.disabled = false;
+                    const body = await res.text();
+                    console.error("Generate questions non-JSON response", res.status, body);
+                    showError('generateError', 'Server returned an error (' + res.status + '). Please try again.');
+                    return;
+                }
+                hideLoading();
+                genBtn.disabled = false;
+
+                console.log("API response:", data);
+                console.log("Questions received:", data.questions ? data.questions.length : 0);
+
+                if (!res.ok || data.error) {
+                    const msg = friendlyError(data);
+                    console.error("Generate questions failed:", res.status, msg, "| full response:", data);
+                    showError('generateError', msg);
+                    return;
+                }
+
+                if (!data.questions || data.questions.length === 0) {
+                    console.error("Generate questions returned an empty question list:", data);
+                    showError('generateError', 'Question generation returned no questions. Please try again.');
+                    return;
+                }
+
+                const interviewState = {
+                    type: 'resume',
+                    role: role,
+                    experience: exp,
+                    interview_type: type,
+                    difficulty: diff,
+                    questions: data.questions,
+                    currentIndex: 0,
+                    answers: {},
+                    analyses: {},
+                    scores: {},
+                    resume_data: resumeData,
+                    started: false
+                };
+                sessionStorage.setItem('resumeInterview', JSON.stringify(interviewState));
+                window.location.href = '/resume-interview';
+
+            } catch (e) {
+                hideLoading();
+                genBtn.disabled = false;
+                console.error("Generate questions network error:", e);
+                showError('generateError', 'Unable to connect to the server. Please check your connection and try again.');
+            }
+        }
+    </script>
+</body>
+</html>
