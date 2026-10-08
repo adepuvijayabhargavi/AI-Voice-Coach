@@ -48,5 +48,5 @@ AI Voice Coach is an AI-powered interview preparation platform that helps users 
 ### 1. Clone the repository
 
 ```bash
-git clone YOUR_GITHUB_REPOSITORY_URL
+git clone https://github.com/adepuvijayabhargavi/AI-Voice-Coach.git
 cd AI-Voice-Coach
